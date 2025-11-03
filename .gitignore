@@ -1,0 +1,13 @@
+# Node / React
+node_modules/
+dist/
+build/
+
+# Symfony / PHP
+vendor/
+.env
+
+# Docker
+*.log
+*.tmp
+docker-compose.override.yml
