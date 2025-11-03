@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  database:
+    image: mysql:8.0
+    container_name: olympic_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: olympic_data
+      MYSQL_USER: symfony
+      MYSQL_PASSWORD: symfony
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: olympic_phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: database
+      PMA_USER: symfony
+      PMA_PASSWORD: symfony
+    ports:
+      - "8080:80"
+
+volumes:
+  db_data:
