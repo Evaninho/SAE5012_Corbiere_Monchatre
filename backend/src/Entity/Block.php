@@ -25,6 +25,9 @@ class Block
     #[ORM\ManyToOne(inversedBy: 'blocks')]
     private ?Article $article = null;
 
+    #[ORM\OneToOne(mappedBy: 'block', cascade: ['persist', 'remove'])]
+    private ?Visualization $visualization = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -74,6 +77,23 @@ class Block
     public function setArticle(?Article $article): static
     {
         $this->article = $article;
+
+        return $this;
+    }
+    public function getVisualization(): ?Visualization
+    {
+        return $this->visualization;
+    }
+
+    public function setVisualization(?Visualization $visualization): static
+    {
+
+        // set the owning side of the relation if necessary
+        if ($visualization !== null && $visualization->getBlock() !== $this) {
+            $visualization->setBlock($this);
+        }
+
+        $this->visualization = $visualization;
 
         return $this;
     }

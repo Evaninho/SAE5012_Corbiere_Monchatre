@@ -48,11 +48,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Rating::class, mappedBy: 'user')]
     private Collection $ratings;
 
+    /**
+     * @var Collection<int, Dataset>
+     */
+    #[ORM\OneToMany(targetEntity: Dataset::class, mappedBy: 'uploadedBy')]
+    private Collection $datasets;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->articles = new ArrayCollection();
         $this->ratings = new ArrayCollection();
+        $this->datasets = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -183,6 +190,36 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             // set the owning side to null (unless already changed)
             if ($rating->getUser() === $this) {
                 $rating->setUser(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Dataset>
+     */
+    public function getDatasets(): Collection
+    {
+        return $this->datasets;
+    }
+
+    public function addDataset(Dataset $dataset): static
+    {
+        if (!$this->datasets->contains($dataset)) {
+            $this->datasets->add($dataset);
+            $dataset->setUploadedBy($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDataset(Dataset $dataset): static
+    {
+        if ($this->datasets->removeElement($dataset)) {
+            // set the owning side to null (unless already changed)
+            if ($dataset->getUploadedBy() === $this) {
+                $dataset->setUploadedBy(null);
             }
         }
 
