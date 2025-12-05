@@ -4,8 +4,10 @@ namespace App\Entity;
 
 use App\Repository\VisualizationRepository;
 use Doctrine\ORM\Mapping as ORM;
-
+use ApiPlatform\Metadata\ApiResource;
 #[ORM\Entity(repositoryClass: VisualizationRepository::class)]
+#[ApiResource]
+
 class Visualization
 {
     #[ORM\Id]

@@ -4,8 +4,10 @@ namespace App\Entity;
 
 use App\Repository\BlockRepository;
 use Doctrine\ORM\Mapping as ORM;
-
+use ApiPlatform\Metadata\ApiResource;
 #[ORM\Entity(repositoryClass: BlockRepository::class)]
+#[ApiResource]
+
 class Block
 {
     #[ORM\Id]

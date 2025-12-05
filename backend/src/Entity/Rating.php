@@ -5,8 +5,10 @@ namespace App\Entity;
 use App\Repository\RatingRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-
+use ApiPlatform\Metadata\ApiResource;
 #[ORM\Entity(repositoryClass: RatingRepository::class)]
+#[ApiResource]
+
 class Rating
 {
     #[ORM\Id]
