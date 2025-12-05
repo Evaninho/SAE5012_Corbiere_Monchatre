@@ -19,8 +19,8 @@ class Block
     #[ORM\Column]
     private array $content = [];
 
-    #[ORM\Column]
-    private ?int $orderIndex = null;
+    #[ORM\Column(nullable: false)]
+    private ?int $orderIndex = 0;
 
     #[ORM\ManyToOne(inversedBy: 'blocks')]
     private ?Article $article = null;

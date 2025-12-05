@@ -23,7 +23,7 @@ class Visualization
     private ?Dataset $dataset = null;
 
     #[ORM\OneToOne(inversedBy: 'visualization', cascade: ['persist', 'remove'])]
-    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\JoinColumn(nullable: true)]
     private ?Block $block = null;
 
     public function getId(): ?int
@@ -75,6 +75,10 @@ class Visualization
     public function setBlock(?Block $block): static
     {
         $this->block = $block;
+
+        if ($block !== null && $block->getVisualization() !== $this) {
+            $block->setVisualization($this);
+        }
 
         return $this;
     }
