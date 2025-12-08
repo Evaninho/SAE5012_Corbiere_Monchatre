@@ -5,26 +5,36 @@ namespace App\Entity;
 use App\Repository\DatasetVariableRepository;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
-#[ORM\Entity(repositoryClass: DatasetVariableRepository::class)]
-#[ApiResource]
+use Symfony\Component\Serializer\Annotation\Groups;
 
+#[ORM\Entity(repositoryClass: DatasetVariableRepository::class)]
+#[ApiResource(
+    normalizationContext: ['groups' => ['variable:read']],
+    denormalizationContext: ['groups' => ['variable:write']]
+)]
 class DatasetVariable
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['variable:read', 'dataset:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['variable:read', 'variable:write', 'dataset:read'])]
     private ?string $name = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['variable:read', 'variable:write', 'dataset:read'])]
     private ?string $type = null;
 
     #[ORM\Column]
+    #[Groups(['variable:read', 'variable:write', 'dataset:read'])]
     private ?int $orderIndex = null;
 
     #[ORM\ManyToOne(inversedBy: 'datasetVariables')]
+    #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['variable:read', 'variable:write'])]
     private ?Dataset $dataset = null;
 
     public function getId(): ?int

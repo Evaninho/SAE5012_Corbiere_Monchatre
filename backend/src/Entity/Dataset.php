@@ -7,38 +7,52 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
+use Symfony\Component\Serializer\Annotation\Groups;
+
 #[ORM\Entity(repositoryClass: DatasetRepository::class)]
-#[ApiResource]
+#[ApiResource(
+    normalizationContext: ['groups' => ['dataset:read']],
+    denormalizationContext: ['groups' => ['dataset:write']]
+)]
 
 class Dataset
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['dataset:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['dataset:read', 'dataset:write', 'visualization:read'])]
     private ?string $name = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['dataset:read', 'dataset:write'])]
     private ?string $path = null;
 
     #[ORM\Column]
+    #[Groups(['dataset:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'datasets')]
+    #[Groups(['dataset:read', 'dataset:write'])]
     private ?User $uploadedBy = null;
 
     /**
      * @var Collection<int, DatasetVariable>
      */
     #[ORM\OneToMany(targetEntity: DatasetVariable::class, mappedBy: 'dataset')]
+    #[Groups(['dataset:read'])]
+
     private Collection $datasetVariables;
 
     /**
      * @var Collection<int, Visualization>
      */
     #[ORM\OneToMany(targetEntity: Visualization::class, mappedBy: 'dataset')]
+    #[Groups(['dataset:read'])]
+
     private Collection $visualizations;
 
     public function __construct()

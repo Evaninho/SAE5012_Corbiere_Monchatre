@@ -6,29 +6,45 @@ use App\Repository\RatingRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
+use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: RatingRepository::class)]
-#[ApiResource]
+#[ApiResource(
+    normalizationContext: ['groups' => ['rating:read']],
+    denormalizationContext: ['groups' => ['rating:write']]
+)]
 
 class Rating
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['rating:read', 'article:read'])]
+
     private ?int $id = null;
 
     #[ORM\Column]
+    #[Groups(['rating:read', 'rating:write', 'article:read'])]
+
     private ?int $stars = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['rating:read', 'rating:write', 'article:read'])]
+
     private ?string $comment = null;
 
     #[ORM\Column]
+    #[Groups(['rating:read', 'article:read'])]
+
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'ratings')]
+    #[Groups(['rating:read'])]
+
     private ?User $user = null;
 
     #[ORM\ManyToOne(inversedBy: 'ratings')]
+    #[Groups(['rating:read', 'rating:write'])]
+
     private ?Article $article = null;
 
     public function getId(): ?int

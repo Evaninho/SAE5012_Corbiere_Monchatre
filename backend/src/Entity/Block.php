@@ -5,29 +5,42 @@ namespace App\Entity;
 use App\Repository\BlockRepository;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
-#[ORM\Entity(repositoryClass: BlockRepository::class)]
-#[ApiResource]
+use Symfony\Component\Serializer\Annotation\Groups;
 
+#[ORM\Entity(repositoryClass: BlockRepository::class)]
+#[ApiResource(
+    normalizationContext: ['groups' => ['block:read']],
+    denormalizationContext: ['groups' => ['block:write']]
+)]
 class Block
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['block:read', 'article:read'])]
+
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['block:read', 'block:write', 'article:read'])]
     private ?string $type = null;
 
     #[ORM\Column]
+    #[Groups(['block:read', 'block:write', 'article:read'])]
+
     private array $content = [];
 
     #[ORM\Column(nullable: false)]
+    #[Groups(['block:read', 'block:write', 'article:read'])]
+
     private ?int $orderIndex = 0;
 
     #[ORM\ManyToOne(inversedBy: 'blocks')]
+    #[Groups(['block:read', 'block:write'])]
     private ?Article $article = null;
 
     #[ORM\OneToOne(mappedBy: 'block', cascade: ['persist', 'remove'])]
+    #[Groups(['block:read'])]
     private ?Visualization $visualization = null;
 
     public function getId(): ?int
