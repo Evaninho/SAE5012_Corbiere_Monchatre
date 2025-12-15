@@ -4,10 +4,17 @@ namespace App\Entity;
 
 use App\Repository\VisualizationRepository;
 use Doctrine\ORM\Mapping as ORM;
-use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Delete};
 use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: VisualizationRepository::class)]
 #[ApiResource(
+     operations: [
+        new Get(),
+        new GetCollection(),
+        new Post(security: "is_granted('ROLE_USER')"),
+        new Put(security: "is_granted('ROLE_USER')"),
+        new Delete(security: "is_granted('ROLE_ADMIN')")
+    ],
     normalizationContext: ['groups' => ['visualization:read']],
     denormalizationContext: ['groups' => ['visualization:write']]
 )]

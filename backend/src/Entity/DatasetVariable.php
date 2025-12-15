@@ -4,11 +4,15 @@ namespace App\Entity;
 
 use App\Repository\DatasetVariableRepository;
 use Doctrine\ORM\Mapping as ORM;
-use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\{ApiResource, Get, Post};
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: DatasetVariableRepository::class)]
 #[ApiResource(
+    operations: [
+        new Get(),
+        new Post(security: "is_granted('ROLE_USER')")
+    ],
     normalizationContext: ['groups' => ['variable:read']],
     denormalizationContext: ['groups' => ['variable:write']]
 )]
