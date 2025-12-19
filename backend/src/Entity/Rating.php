@@ -5,10 +5,17 @@ namespace App\Entity;
 use App\Repository\RatingRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use ApiPlatform\Metadata\ApiResource;
 use Symfony\Component\Serializer\Annotation\Groups;
+use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Delete};
+
 #[ORM\Entity(repositoryClass: RatingRepository::class)]
 #[ApiResource(
+    operations: [
+        new Get(),
+        new GetCollection(),
+        new Post(security: "is_granted('ROLE_USER')"),
+        new Delete(security: "is_granted('ROLE_ADMIN')")
+    ],
     normalizationContext: ['groups' => ['rating:read']],
     denormalizationContext: ['groups' => ['rating:write']]
 )]

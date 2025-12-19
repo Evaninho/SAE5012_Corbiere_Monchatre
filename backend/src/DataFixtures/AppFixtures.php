@@ -12,9 +12,16 @@ use App\Entity\Rating;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Faker\Factory;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class AppFixtures extends Fixture
 {
+    private UserPasswordHasherInterface $passwordHasher;
+
+    public function __construct(UserPasswordHasherInterface $passwordHasher)
+    {
+        $this->passwordHasher = $passwordHasher;
+    }
     public function load(ObjectManager $manager): void
     {
         $faker = Factory::create('fr_FR');
@@ -27,7 +34,12 @@ class AppFixtures extends Fixture
         // Admin
         $admin = new User();
         $admin->setEmail("admin@olympeak.com");
-        $admin->setPassword("admin123"); // ⚠️ À encoder si tu utilises password hashing
+        $admin->setPrenom($faker->firstName());
+        $admin->setNom($faker->lastName());
+        $admin->setPseudo($faker->userName());
+        $admin->setPays($faker->country());
+        $admin->setSportFavoris($faker->word());
+        $admin->setPassword($this->passwordHasher->hashPassword($admin, 'admin123'));
         $admin->setRoles(["ROLE_ADMIN"]);
         $manager->persist($admin);
         $users[] = $admin;
@@ -36,7 +48,15 @@ class AppFixtures extends Fixture
         for ($i = 0; $i < 4; $i++) {
             $u = new User();
             $u->setEmail($faker->unique()->email());
-            $u->setPassword("password");
+        
+            $u->setPrenom($faker->firstName());
+            $u->setNom($faker->lastName());
+            $u->setPseudo($faker->userName());
+            $u->setPays($faker->country());
+            $u->setSportFavoris($faker->word());
+            $u->setPassword(
+                $this->passwordHasher->hashPassword($u, 'password')
+            );
             $u->setRoles(["ROLE_USER"]);
             $manager->persist($u);
             $users[] = $u;

@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20251208142323 extends AbstractMigration
+final class Version20251215084731 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -21,11 +21,13 @@ final class Version20251208142323 extends AbstractMigration
     {
         // this up() migration is auto-generated, please modify it to your needs
         $this->addSql('ALTER TABLE dataset_variable CHANGE dataset_id dataset_id INT NOT NULL');
+        $this->addSql('ALTER TABLE visualization CHANGE block_id block_id INT DEFAULT NULL');
     }
 
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
+        $this->addSql('ALTER TABLE visualization CHANGE block_id block_id INT NOT NULL');
         $this->addSql('ALTER TABLE dataset_variable CHANGE dataset_id dataset_id INT DEFAULT NULL');
     }
 }
