@@ -49,6 +49,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     private ?string $email = null;
 
+    #[ORM\Column(nullable: true)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $prenom = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $nom = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $pseudo = null;
+
+    #[ORM\Column(length: 100, nullable: true)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $pays = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $sportFavoris = null;
+
     /**
      * @var list<string> The user roles
      */
@@ -113,6 +133,60 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function getPrenom(): ?string
+    {
+        return $this->prenom;
+    }
+
+    public function setPrenom(?string $prenom): static
+    {
+        $this->prenom = $prenom;
+        return $this;
+    }
+
+    public function getNom(): ?string
+    {
+        return $this->nom;
+    }
+
+    public function setNom(?string $nom): static
+    {
+        $this->nom = $nom;
+        return $this;
+    }
+
+    public function getPseudo(): ?string
+    {
+        return $this->pseudo;
+    }
+
+    public function setPseudo(?string $pseudo): static
+    {
+        $this->pseudo = $pseudo;
+        return $this;
+    }
+
+    public function getPays(): ?string
+    {
+        return $this->pays;
+    }
+
+    public function setPays(?string $pays): static
+    {
+        $this->pays = $pays;
+        return $this;
+    }
+
+    public function getSportFavoris(): ?string
+    {
+        return $this->sportFavoris;
+    }
+
+    public function setSportFavoris(?string $sportFavoris): static
+    {
+        $this->sportFavoris = $sportFavoris;
+        return $this;
+    }
     /**
      * A visual identifier that represents this user.
      *

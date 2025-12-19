@@ -34,6 +34,11 @@ class AppFixtures extends Fixture
         // Admin
         $admin = new User();
         $admin->setEmail("admin@olympeak.com");
+        $admin->setPrenom($faker->firstName());
+        $admin->setNom($faker->lastName());
+        $admin->setPseudo($faker->userName());
+        $admin->setPays($faker->country());
+        $admin->setSportFavoris($faker->word());
         $admin->setPassword($this->passwordHasher->hashPassword($admin, 'admin123'));
         $admin->setRoles(["ROLE_ADMIN"]);
         $manager->persist($admin);
@@ -43,6 +48,12 @@ class AppFixtures extends Fixture
         for ($i = 0; $i < 4; $i++) {
             $u = new User();
             $u->setEmail($faker->unique()->email());
+        
+            $u->setPrenom($faker->firstName());
+            $u->setNom($faker->lastName());
+            $u->setPseudo($faker->userName());
+            $u->setPays($faker->country());
+            $u->setSportFavoris($faker->word());
             $u->setPassword(
                 $this->passwordHasher->hashPassword($u, 'password')
             );
