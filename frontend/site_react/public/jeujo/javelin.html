@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lancer de Javelot Réaliste 3D</title>
+<style>
+body { 
+  margin: 0; 
+  font-family: 'Arial', sans-serif; 
+  overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+#intro-screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(40,40,40,0.95));
+  padding: 50px 70px;
+  border-radius: 20px;
+  color: white;
+  text-align: center;
+  z-index: 30;
+  border: 3px solid rgba(255,215,0,0.5);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+  backdrop-filter: blur(10px);
+  max-width: 600px;
+}
+
+#intro-screen h1 {
+  margin: 0 0 20px 0;
+  font-size: 48px;
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255,215,0,0.6);
+}
+
+#intro-screen .emoji {
+  font-size: 64px;
+  margin: 20px 0;
+}
+
+#intro-screen h2 {
+  color: #4fc3f7;
+  font-size: 24px;
+  margin: 25px 0 15px 0;
+  text-align: left;
+}
+
+#intro-screen .step {
+  background: rgba(255,255,255,0.1);
+  padding: 15px 20px;
+  border-radius: 10px;
+  margin: 15px 0;
+  text-align: left;
+  border-left: 4px solid #4fc3f7;
+}
+
+#intro-screen .step-number {
+  display: inline-block;
+  background: linear-gradient(135deg, #4fc3f7, #2196f3);
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  line-height: 35px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 20px;
+  margin-right: 15px;
+  vertical-align: middle;
+}
+
+#intro-screen .step-text {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 18px;
+  line-height: 1.5;
+  max-width: calc(100% - 60px);
+}
+
+#intro-screen .highlight {
+  color: #ffeb3b;
+  font-weight: bold;
+}
+
+#start-game-btn {
+  margin-top: 35px;
+  padding: 20px 60px;
+  font-size: 26px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #000;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 5px 25px rgba(255,215,0,0.5);
+  transition: all 0.3s;
+  animation: pulse-btn 2s infinite;
+}
+
+@keyframes pulse-btn {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+#start-game-btn:hover {
+  transform: translateY(-3px) scale(1.08);
+  box-shadow: 0 8px 30px rgba(255,215,0,0.7);
+}
+
+#hud {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(40,40,40,0.85));
+  padding: 25px 40px;
+  border-radius: 15px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  color: white;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,255,255,0.1);
+  display: none;
+}
+
+#instructions {
+  font-size: 20px;
+  margin-bottom: 15px;
+  color: #4fc3f7;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+#countdown {
+  font-size: 48px;
+  font-weight: bold;
+  margin: 15px 0;
+  color: #ff9800;
+  text-shadow: 0 0 20px rgba(255,152,0,0.8);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+#force-container {
+  margin: 20px 0;
+}
+
+#force-label {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+#force-bar {
+  width: 300px;
+  height: 30px;
+  background: rgba(255,255,255,0.1);
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 15px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+}
+
+#force-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #8bc34a, #ffeb3b, #ff9800, #f44336);
+  width: 0%;
+  transition: width 0.1s;
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(76,175,80,0.6);
+}
+
+#force-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+#angle-container {
+  margin: 20px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+}
+
+#angle-bar {
+  width: 30px;
+  height: 250px;
+  background: rgba(255,255,255,0.1);
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 15px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+}
+
+#angle-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #2196f3, #03a9f4);
+  transition: bottom 0.05s;
+  box-shadow: 0 0 15px rgba(33,150,243,0.8);
+}
+
+#angle-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #2196f3;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+#distance {
+  font-size: 32px;
+  margin-top: 20px;
+  color: #4caf50;
+  font-weight: bold;
+  text-shadow: 0 0 20px rgba(76,175,80,0.8);
+}
+
+#records {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(40,40,40,0.85));
+  padding: 20px;
+  border-radius: 15px;
+  color: white;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,255,255,0.1);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  display: none;
+}
+
+#records h3 {
+  margin: 0 0 10px 0;
+  color: #4fc3f7;
+  font-size: 18px;
+}
+
+#records div {
+  margin: 5px 0;
+  font-size: 16px;
+}
+
+#retry-btn {
+  margin-top: 20px;
+  padding: 15px 40px;
+  font-size: 18px;
+  background: linear-gradient(135deg, #4caf50, #8bc34a);
+  color: white;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 5px 20px rgba(76,175,80,0.4);
+  transition: all 0.3s;
+  display: none;
+}
+
+#retry-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 25px rgba(76,175,80,0.6);
+}
+
+canvas {
+  display: block;
+}
+
+#back-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 2px solid white;
+  padding: 12px 25px;
+  font-size: 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+  z-index: 15;
+}
+
+#back-btn:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+</style>
+</head>
+<body>
+  <button id="back-btn" onclick="goBack()">← Menu</button>
+
+<!-- Écran d'introduction -->
+<div id="intro-screen">
+  <div class="emoji">🏹</div>
+  <h1>LANCER DE JAVELOT</h1>
+  <p style="font-size: 18px; color: #aaa; margin-bottom: 30px;">
+    Devenez champion olympique !
+  </p>
+
+  <h2>📋 Comment jouer ?</h2>
+  
+  <div class="step">
+    <span class="step-number">1</span>
+    <span class="step-text">
+      <span class="highlight">Cliquez rapidement</span> pendant 5 secondes pour charger la force
+    </span>
+  </div>
+
+  <div class="step">
+    <span class="step-number">2</span>
+    <span class="step-text">
+      Attendez que l'indicateur passe dans la <span class="highlight">zone idéale</span> et cliquez pour fixer l'angle
+    </span>
+  </div>
+
+  <div class="step">
+    <span class="step-number">3</span>
+    <span class="step-text">
+      Regardez votre javelot voler et <span class="highlight">battez votre record</span> !
+    </span>
+  </div>
+
+  <p style="margin-top: 30px; font-size: 16px; color: #888;">
+    💡 <strong>Astuce :</strong> Plus vous cliquez vite, plus le javelot ira loin !
+  </p>
+
+  <button id="start-game-btn">🚀 COMMENCER</button>
+</div>
+
+<div id="hud">
+  <div id="instructions">Cliquez rapidement pour charger la force !</div>
+  <div id="countdown">5</div>
+  
+  <div id="force-container">
+    <div id="force-label">💪 FORCE</div>
+    <div id="force-bar">
+      <div id="force-fill"></div>
+      <div id="force-value">0 clics</div>
+    </div>
+  </div>
+  
+  <div id="angle-container" style="display:none;">
+    <div id="angle-bar">
+      <div id="angle-indicator"></div>
+    </div>
+    <div id="angle-value">45°</div>
+  </div>
+  
+  <div id="distance"></div>
+  <button id="retry-btn">🔄 Recommencer</button>
+</div>
+
+<div id="records">
+  <h3>🏆 Records</h3>
+  <div>Meilleur: <span id="best-distance">0</span>m</div>
+  <div>Dernier: <span id="last-distance">0</span>m</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+
+function goBack() {
+  window.location.href = 'menu.html';
+}
+
+let scene, camera, renderer, javelin, athlete;
+let phase = 'intro';
+let clickCount = 0;
+const SPEED_PER_CLICK = 0.5;
+const BASE_SPEED = 10;
+let angleValue = 45;
+let angleDirection = 1;
+let timeLeft = 5;
+let launchAngle = 0;
+let velocity = { x: 0, y: 0, z: 0 };
+let isFlying = false;
+let bestDistance = 0;
+let lastDistance = 0;
+let gameStarted = false;
+
+// Elements DOM
+const introScreen = document.getElementById('intro-screen');
+const startGameBtn = document.getElementById('start-game-btn');
+const hud = document.getElementById('hud');
+const records = document.getElementById('records');
+const forceFill = document.getElementById('force-fill');
+const forceValue = document.getElementById('force-value');
+const angleIndicator = document.getElementById('angle-indicator');
+const angleValueEl = document.getElementById('angle-value');
+const countdownEl = document.getElementById('countdown');
+const distanceEl = document.getElementById('distance');
+const instructionsEl = document.getElementById('instructions');
+const forceContainer = document.getElementById('force-container');
+const angleContainer = document.getElementById('angle-container');
+const retryBtn = document.getElementById('retry-btn');
+const bestDistanceEl = document.getElementById('best-distance');
+const lastDistanceEl = document.getElementById('last-distance');
+
+// Bouton démarrer le jeu
+startGameBtn.addEventListener('click', startGame);
+
+function startGame() {
+  introScreen.style.display = 'none';
+  hud.style.display = 'block';
+  records.style.display = 'block';
+  phase = 'force';
+  gameStarted = true;
+}
+
+function init() {
+  // Scene
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 50, 300);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(-5, 3, 5);
+  camera.lookAt(0, 1, 0);
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  // Lumières
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(10, 20, 10);
+  directionalLight.castShadow = true;
+  directionalLight.shadow.camera.left = -50;
+  directionalLight.shadow.camera.right = 50;
+  directionalLight.shadow.camera.top = 50;
+  directionalLight.shadow.camera.bottom = -50;
+  directionalLight.shadow.mapSize.width = 2048;
+  directionalLight.shadow.mapSize.height = 2048;
+  scene.add(directionalLight);
+
+  const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x228b22, 0.5);
+  scene.add(hemisphereLight);
+
+  // Terrain
+  const groundGeo = new THREE.PlaneGeometry(300, 100);
+  const groundMat = new THREE.MeshStandardMaterial({ 
+    color: 0x228b22,
+    roughness: 0.8,
+    metalness: 0.2
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Lignes de distance tous les 10m
+  for (let i = 0; i <= 150; i += 10) {
+    const lineGeo = new THREE.PlaneGeometry(1, 100);
+    const lineMat = new THREE.MeshBasicMaterial({ 
+      color: 0xffffff, 
+      transparent: true, 
+      opacity: 0.5,
+      side: THREE.DoubleSide
+    });
+    const line = new THREE.Mesh(lineGeo, lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(i, 0.02, 0);
+    scene.add(line);
+
+    if (i > 0 && i % 10 === 0) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(i + 'm', 64, 48);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({ map: texture });
+      const sprite = new THREE.Sprite(spriteMat);
+      sprite.position.set(i, 0.5, -8);
+      sprite.scale.set(4, 2, 1);
+      scene.add(sprite);
+    }
+  }
+
+  // Athlète
+  const athleteGroup = new THREE.Group();
+  
+  const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.5, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff6b6b });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.75;
+  body.castShadow = true;
+  athleteGroup.add(body);
+
+  const headGeo = new THREE.SphereGeometry(0.3, 16, 16);
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xffcba4 });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 1.8;
+  head.castShadow = true;
+  athleteGroup.add(head);
+
+  const armGeo = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0xffcba4 });
+  const arm = new THREE.Mesh(armGeo, armMat);
+  arm.position.set(0.5, 1.2, 0);
+  arm.rotation.z = Math.PI / 4;
+  arm.castShadow = true;
+  athleteGroup.add(arm);
+
+  athleteGroup.position.set(0, 0, 0);
+  scene.add(athleteGroup);
+  athlete = athleteGroup;
+
+  // Javelot
+  const javelinGroup = new THREE.Group();
+  
+  const shaftGeo = new THREE.CylinderGeometry(0.02, 0.02, 2.5, 8);
+  const shaftMat = new THREE.MeshStandardMaterial({ 
+    color: 0xd4af37,
+    metalness: 0.7,
+    roughness: 0.3
+  });
+  const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+  shaft.rotation.z = Math.PI / 2;
+  shaft.castShadow = true;
+  javelinGroup.add(shaft);
+
+  const tipGeo = new THREE.ConeGeometry(0.05, 0.3, 8);
+  const tipMat = new THREE.MeshStandardMaterial({ 
+    color: 0xc0c0c0,
+    metalness: 0.9,
+    roughness: 0.1
+  });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.rotation.z = -Math.PI / 2;
+  tip.position.x = 1.4;
+  tip.castShadow = true;
+  javelinGroup.add(tip);
+
+  javelinGroup.position.set(0.8, 1.5, 0);
+  javelinGroup.rotation.z = Math.PI / 6;
+  scene.add(javelinGroup);
+  javelin = javelinGroup;
+
+  // Nuages
+  for (let i = 0; i < 20; i++) {
+    const cloudGeo = new THREE.SphereGeometry(Math.random() * 2 + 1, 8, 8);
+    const cloudMat = new THREE.MeshBasicMaterial({ 
+      color: 0xffffff, 
+      transparent: true, 
+      opacity: 0.7 
+    });
+    const cloud = new THREE.Mesh(cloudGeo, cloudMat);
+    cloud.position.set(
+      Math.random() * 200 - 100,
+      Math.random() * 20 + 15,
+      Math.random() * 80 - 40
+    );
+    scene.add(cloud);
+  }
+
+  // Events
+  document.addEventListener('click', onClick);
+  retryBtn.addEventListener('click', resetGame);
+  window.addEventListener('resize', onWindowResize);
+
+  animate();
+}
+
+function onClick() {
+  if (!gameStarted) return;
+  
+  if (phase === 'force') {
+    clickCount++;
+    const visualPercent = Math.min(100, clickCount * 2);
+    forceFill.style.width = visualPercent + '%';
+    forceValue.textContent = clickCount + ' clics';
+  } else if (phase === 'angle') {
+    launchAngle = angleValue;
+    phase = 'launch';
+    launchJavelin();
+  }
+}
+
+function launchJavelin() {
+  instructionsEl.textContent = '🚀 Le javelot décolle !';
+  angleContainer.style.display = 'none';
+  
+  const speed = BASE_SPEED + clickCount * SPEED_PER_CLICK;
+  const angleRad = (launchAngle * Math.PI) / 180;
+  
+  velocity.x = speed * Math.cos(angleRad);
+  velocity.y = speed * Math.sin(angleRad);
+  velocity.z = 0;
+  
+  isFlying = true;
+  athlete.rotation.z = -Math.PI / 6;
+}
+
+function resetGame() {
+  phase = 'force';
+  clickCount = 0;
+  angleValue = 45;
+  timeLeft = 5;
+  isFlying = false;
+  velocity = { x: 0, y: 0, z: 0 };
+  
+  javelin.position.set(0.8, 1.5, 0);
+  javelin.rotation.set(0, 0, Math.PI / 6);
+  
+  athlete.position.set(0, 0, 0);
+  athlete.rotation.z = 0;
+  
+  camera.position.set(-5, 3, 5);
+  camera.lookAt(0, 1, 0);
+  
+  forceFill.style.width = '0%';
+  forceValue.textContent = '0 clics';
+  forceFill.style.background = 'linear-gradient(90deg, #4caf50, #8bc34a, #ffeb3b, #ff9800, #f44336)';
+  angleIndicator.style.bottom = '50%';
+  
+  instructionsEl.textContent = 'Cliquez rapidement pour charger la force !';
+  countdownEl.style.display = 'block';
+  countdownEl.textContent = '5';
+  forceContainer.style.display = 'block';
+  angleContainer.style.display = 'none';
+  distanceEl.textContent = '';
+  retryBtn.style.display = 'none';
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+let lastTime = Date.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+  
+  const currentTime = Date.now();
+  const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
+  lastTime = currentTime;
+
+  if (phase === 'force') {
+    timeLeft -= deltaTime;
+    countdownEl.textContent = Math.ceil(Math.max(0, timeLeft));
+    
+    if (timeLeft <= 0) {
+      forceFill.style.width = Math.min(100, clickCount * 2) + '%';
+      forceValue.textContent = clickCount + ' clics';
+      
+      phase = 'angle';
+      instructionsEl.textContent = '🎯 Cliquez pour fixer l\'angle !';
+      countdownEl.style.display = 'none';
+      forceContainer.style.display = 'none';
+      angleContainer.style.display = 'flex';
+    }
+  } else if (phase === 'angle') {
+    angleValue += angleDirection * deltaTime * 80;
+    if (angleValue >= 85) {
+      angleValue = 85;
+      angleDirection = -1;
+    }
+    if (angleValue <= 15) {
+      angleValue = 15;
+      angleDirection = 1;
+    }
+    
+    const percentage = ((angleValue - 15) / 70) * 100;
+    angleIndicator.style.bottom = percentage + '%';
+    angleValueEl.textContent = Math.round(angleValue) + '°';
+  } else if (phase === 'launch' && isFlying) {
+    velocity.y -= 9.81 * deltaTime;
+    
+    javelin.position.x += velocity.x * deltaTime;
+    javelin.position.y += velocity.y * deltaTime;
+    javelin.position.z += velocity.z * deltaTime;
+    
+    const angle = Math.atan2(velocity.y, velocity.x);
+    javelin.rotation.z = angle;
+    
+    const targetCamX = javelin.position.x - 8;
+    const targetCamY = javelin.position.y + 5;
+    const targetCamZ = javelin.position.z + 5;
+    
+    camera.position.x += (targetCamX - camera.position.x) * 0.05;
+    camera.position.y += (targetCamY - camera.position.y) * 0.05;
+    camera.position.z += (targetCamZ - camera.position.z) * 0.05;
+    camera.lookAt(javelin.position);
+    
+    if (javelin.position.y <= 0) {
+      javelin.position.y = 0;
+      isFlying = false;
+      phase = 'end';
+      
+      const distance = Math.round(javelin.position.x);
+      lastDistance = distance;
+      lastDistanceEl.textContent = distance;
+      
+      if (distance > bestDistance) {
+        bestDistance = distance;
+        bestDistanceEl.textContent = distance;
+      }
+      
+      distanceEl.textContent = '🎯 Distance: ' + distance + ' m';
+      retryBtn.style.display = 'block';
+      
+      if (distance > 80) {
+        instructionsEl.textContent = '🏆 CHAMPION OLYMPIQUE !';
+      } else if (distance > 60) {
+        instructionsEl.textContent = '🥇 Excellent lancer !';
+      } else if (distance > 40) {
+        instructionsEl.textContent = '👍 Bon lancer !';
+      } else {
+        instructionsEl.textContent = '💪 Vous pouvez faire mieux !';
+      }
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+init();
+</script>
+</body>
+</html>

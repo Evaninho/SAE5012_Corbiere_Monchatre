@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jeux Olympiques - Mini Jeux</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Arial', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  padding: 20px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 60px;
+  animation: fadeInDown 1s;
+}
+
+.header h1 {
+  font-size: 64px;
+  color: #fff;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  margin-bottom: 10px;
+  letter-spacing: 2px;
+}
+
+.header p {
+  font-size: 24px;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.game-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+  border-radius: 20px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  position: relative;
+  overflow: hidden;
+  animation: fadeInUp 1s;
+  animation-fill-mode: both;
+}
+
+.game-card:nth-child(1) { animation-delay: 0.1s; }
+.game-card:nth-child(2) { animation-delay: 0.2s; }
+.game-card:nth-child(3) { animation-delay: 0.3s; }
+
+.game-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  transition: left 0.5s;
+}
+
+.game-card:hover::before {
+  left: 100%;
+}
+
+.game-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 0 15px 50px rgba(0,0,0,0.3);
+}
+
+.game-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  display: block;
+  animation: bounce 2s infinite;
+}
+
+.game-card:nth-child(1) .game-icon { animation-delay: 0s; }
+.game-card:nth-child(2) .game-icon { animation-delay: 0.2s; }
+.game-card:nth-child(3) .game-icon { animation-delay: 0.4s; }
+
+.game-card h2 {
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.game-card p {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+
+.play-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  padding: 15px 40px;
+  font-size: 18px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+  box-shadow: 0 5px 20px rgba(102,126,234,0.4);
+}
+
+.play-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 7px 25px rgba(102,126,234,0.6);
+}
+
+.game-card.javelin { border-top: 5px solid #ffd700; }
+.game-card.hurdles { border-top: 5px solid #ff5252; }
+.game-card.swimming { border-top: 5px solid #2196f3; }
+
+.footer {
+  text-align: center;
+  margin-top: 40px;
+  animation: fadeIn 2s;
+}
+
+.home-btn {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 2px solid white;
+  padding: 12px 35px;
+  font-size: 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+}
+
+.home-btn:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header h1 {
+    font-size: 42px;
+  }
+  
+  .header p {
+    font-size: 18px;
+  }
+  
+  .games-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏅 JEUX OLYMPIQUES 🏅</h1>
+      <p>Choisissez votre discipline et visez l'or !</p>
+    </div>
+
+    <div class="games-grid">
+      <div class="game-card javelin" onclick="playGame('javelin')">
+        <span class="game-icon">🏹</span>
+        <h2>Lancer de Javelot</h2>
+        <p>Maîtrisez la force et l'angle parfait pour lancer votre javelot le plus loin possible !</p>
+        <button class="play-btn">▶ JOUER</button>
+      </div>
+
+      <div class="game-card hurdles" onclick="playGame('hurdles')">
+        <span class="game-icon">🏃‍♂️</span>
+        <h2>Course de Haies</h2>
+        <p>Sautez par-dessus les haies et évitez les 3 fautes fatales dans cette course effrénée !</p>
+        <button class="play-btn">▶ JOUER</button>
+      </div>
+
+      <div class="game-card swimming" onclick="playGame('swimming')">
+        <span class="game-icon">🏊‍♂️</span>
+        <h2>Natation</h2>
+        <p>Nagez le plus vite possible en cliquant au bon rythme pour atteindre la ligne d'arrivée !</p>
+        <button class="play-btn">▶ JOUER</button>
+      </div>
+    </div>
+
+    <div class="footer">
+      <button class="home-btn" onclick="goHome()">🏠 Retour à l'Accueil</button>
+    </div>
+  </div>
+
+  <script>
+    function playGame(game) {
+      // Redirection vers les pages de jeux
+      const gamePages = {
+        'javelin': 'javelin.html',
+        'hurdles': 'hurdles.html',
+        'swimming': 'swimming.html'
+      };
+      
+      if (gamePages[game]) {
+        window.location.href = gamePages[game];
+      }
+    }
+
+    function goHome() {
+      // Redirection vers la page d'accueil
+      // Modifiez cette URL selon votre structure de site
+      window.location.href = 'http://localhost:5173/jeux';
+    }
+
+    // Effet de particules en arrière-plan
+    function createParticle() {
+      const particle = document.createElement('div');
+      particle.style.position = 'fixed';
+      particle.style.width = Math.random() * 10 + 5 + 'px';
+      particle.style.height = particle.style.width;
+      particle.style.borderRadius = '50%';
+      particle.style.background = 'rgba(255,255,255,0.5)';
+      particle.style.left = Math.random() * 100 + '%';
+      particle.style.top = '-20px';
+      particle.style.pointerEvents = 'none';
+      particle.style.zIndex = '1';
+      document.body.appendChild(particle);
+
+      const duration = Math.random() * 3 + 2;
+      const animation = particle.animate([
+        { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
+        { transform: `translateY(${window.innerHeight + 50}px) rotate(360deg)`, opacity: 0 }
+      ], {
+        duration: duration * 1000,
+        easing: 'linear'
+      });
+
+      animation.onfinish = () => particle.remove();
+    }
+
+    setInterval(createParticle, 300);
+  </script>
+</body>
+</html>

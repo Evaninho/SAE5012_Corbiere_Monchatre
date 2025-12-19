@@ -50,6 +50,11 @@ export function ContactPage() {
         cursor: "pointer",
         fontSize: "16px",
     };
+    const divInputStyle = {
+        display: "flex",
+        flexDirection: "column",
+        gap: "15px",
+    };
 
   return (
     <main>
@@ -57,20 +62,20 @@ export function ContactPage() {
       <form style={formElementStyle}>
         <p>Une question, une suggestion ? N'hésitez pas à nous contacter !</p>
 
-        <div>
-          <label htmlFor="usernom">Nom complet :</label><br />
+        <div style={divInputStyle}>
+          <label htmlFor="usernom">Nom complet :</label>
           <input type="text" id="usernom" name="usernom" placeholder="jean dupont" required style={inputStyle} />
-        </div>vs
-        <div>
-          <label htmlFor="useremail">Email :</label><br />
+        </div>
+        <div style={divInputStyle}>
+          <label htmlFor="useremail">Email :</label>
           <input type="email" id="useremail" name="useremail" placeholder="jean.dupont@email.com" required style={inputStyle} />
         </div>
-        <div>
-          <label htmlFor="usersujet">Sujet :</label><br />
+        <div style={divInputStyle}>
+          <label htmlFor="usersujet">Sujet :</label>
           <input type="text" id="usersujet" name="usersujet" placeholder="Sujet de votre message" required style={inputStyle} />
         </div>
-        <div>
-          <label htmlFor="usermessage">Message :</label><br />
+        <div style={divInputStyle}>
+          <label htmlFor="usermessage">Message :</label>
           <textarea id="usermessage" name="usermessage" placeholder="Votre message ici..." required style={inputStyleTextarea} rows="5"></textarea>
         </div>
 

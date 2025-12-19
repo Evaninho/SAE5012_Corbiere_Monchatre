@@ -41,10 +41,11 @@ export function RegisterForm() {
         paddingBottom: "8vh",
         fontFamily: "Arial, sans-serif",
         gap: "10px",
-        border: "2px solid #0085C7",
         borderRadius: "25px",
         padding: "20px",
-        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+        marginTop: "40px",
+        marginBottom: "40px",
+        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
         backgroundColor: "#f9f9f9",
     };
 
@@ -447,7 +448,7 @@ export function RegisterForm() {
                             {errors.sports && <div style={errorMessageStyle}>{errors.sports}</div>}
                         </div>
 
-                        <div>
+                        {/* <div>
                             <label htmlFor="equipe">Équipe olympique préférée :</label>
                             <input
                                 type="text"
@@ -458,7 +459,7 @@ export function RegisterForm() {
                                 onChange={handleChange}
                                 style={inputStyle}
                             />
-                        </div>
+                        </div> */}
 
                         <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
                             <button type="button" onClick={handleBack} style={buttonStyleBack}>

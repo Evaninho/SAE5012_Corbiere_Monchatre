@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Course de Haies Olympique - Three.js</title>
+<style>
+body { 
+  margin: 0; 
+  font-family: 'Arial', sans-serif; 
+  overflow: hidden;
+  background: #000;
+}
+
+#hud {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(40,40,40,0.85));
+  padding: 20px 40px;
+  border-radius: 15px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  color: white;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,215,0,0.3);
+  min-width: 300px;
+}
+
+#score-container {
+  display: flex;
+  justify-content: space-around;
+  gap: 30px;
+  margin-bottom: 15px;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 0 0 15px rgba(255,215,0,0.6);
+}
+
+#faults {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.fault-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #4caf50;
+  border: 3px solid #fff;
+  box-shadow: 0 0 10px rgba(76,175,80,0.6);
+  transition: all 0.3s;
+}
+
+.fault-icon.lost {
+  background: #f44336;
+  box-shadow: 0 0 10px rgba(244,67,54,0.6);
+}
+
+#instructions {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(40,40,40,0.95));
+  padding: 40px 60px;
+  border-radius: 20px;
+  color: white;
+  text-align: center;
+  z-index: 20;
+  border: 3px solid rgba(255,215,0,0.5);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+#instructions h1 {
+  margin: 0 0 20px 0;
+  font-size: 42px;
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255,215,0,0.6);
+}
+
+#instructions p {
+  font-size: 20px;
+  margin: 15px 0;
+  line-height: 1.6;
+}
+
+#instructions .key {
+  display: inline-block;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: bold;
+  font-size: 24px;
+  margin: 0 5px;
+  box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+}
+
+#start-btn {
+  margin-top: 30px;
+  padding: 20px 50px;
+  font-size: 24px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  color: #000;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 5px 25px rgba(255,215,0,0.5);
+  transition: all 0.3s;
+}
+
+#start-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(255,215,0,0.7);
+}
+
+#game-over {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(244,67,54,0.95), rgba(156,39,176,0.95));
+  padding: 50px 70px;
+  border-radius: 20px;
+  color: white;
+  text-align: center;
+  z-index: 20;
+  display: none;
+  border: 3px solid rgba(255,255,255,0.3);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+#game-over h1 {
+  margin: 0 0 20px 0;
+  font-size: 52px;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+#game-over p {
+  font-size: 24px;
+  margin: 15px 0;
+}
+
+#retry-btn {
+  margin-top: 30px;
+  padding: 20px 50px;
+  font-size: 22px;
+  background: linear-gradient(135deg, #4caf50, #8bc34a);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 5px 25px rgba(76,175,80,0.5);
+  transition: all 0.3s;
+}
+
+#retry-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(76,175,80,0.7);
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+canvas {
+  display: block;
+}
+
+#back-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 2px solid white;
+  padding: 12px 25px;
+  font-size: 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+  z-index: 15;
+}
+
+#back-btn:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+</style>
+</head>
+<body>
+  <button id="back-btn" onclick="goBack()">← Menu</button>
+<div id="hud" style="display:none;">
+  <div id="score-container">
+    <div class="stat">
+      <div class="stat-label">🏆 SCORE</div>
+      <div class="stat-value" id="score">0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">⚡ VITESSE</div>
+      <div class="stat-value" id="speed">1.0x</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">🎯 HAIES</div>
+      <div class="stat-value" id="hurdles-count">0</div>
+    </div>
+  </div>
+  <div id="faults">
+    <div class="fault-icon" id="fault1"></div>
+    <div class="fault-icon" id="fault2"></div>
+    <div class="fault-icon" id="fault3"></div>
+  </div>
+</div>
+
+<div id="instructions">
+  <h1>🏃‍♂️ COURSE DE HAIES 🏅</h1>
+  <p>Bienvenue dans les Jeux Olympiques !</p>
+  <p>Sautez par-dessus les haies avec <span class="key">ESPACE</span></p>
+  <p>⚠️ Attention : <strong>3 fautes maximum</strong></p>
+  <p>Les haies arrivent de plus en plus vite !</p>
+  <button id="start-btn">🚀 COMMENCER LA COURSE</button>
+</div>
+
+<div id="game-over">
+  <h1>🏁 COURSE TERMINÉE</h1>
+  <p>Score Final: <span id="final-score">0</span></p>
+  <p>Haies Franchies: <span id="final-hurdles">0</span></p>
+  <p>Record: <span id="best-score">0</span></p>
+  <button id="retry-btn">🔄 RECOMMENCER</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+
+function goBack() {
+  window.location.href = 'menu.html';
+}
+
+let scene, camera, renderer;
+let track, hurdles = [], crowds = [], particles = [];
+let isGameRunning = false;
+let isJumping = false;
+let jumpHeight = 0;
+let jumpVelocity = 0;
+let score = 0;
+let hurdlesCleared = 0;
+let faults = 0;
+let speed = 1;
+let baseSpeed = 0.15;
+let hurdleSpawnTimer = 0;
+let nextHurdleDistance = 30;
+let bestScore = 0;
+let cameraShake = 0;
+let frameCounter = 0; // <-- ajouté pour réduire la fréquence d'updates de la foule
+
+const JUMP_POWER = 0.35;
+const GRAVITY = 0.015;
+const PLAYER_HEIGHT = 1.7;
+const HURDLE_HEIGHT = 1.1;
+
+function init() {
+  // Scene
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 80, 250);
+
+  // Camera (vue FPS)
+  camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 300);
+  camera.position.set(0, PLAYER_HEIGHT, 0);
+  camera.rotation.x = -0.05;
+
+  // Renderer (allégé)
+  renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" }); // antialias désactivé
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // limiter DPR
+  renderer.shadowMap.enabled = false; // désactiver les ombres pour alléger
+  document.body.appendChild(renderer.domElement);
+
+  // Lumières (plus simples)
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(ambientLight);
+
+  // lumière directionnelle sans ombre (léger)
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(40, 80, 40);
+  dirLight.castShadow = false;
+  scene.add(dirLight);
+
+  // Piste olympique avec texture
+  const trackGeo = new THREE.PlaneGeometry(10, 500);
+  const trackMat = new THREE.MeshStandardMaterial({ 
+    color: 0xc62828,
+    roughness: 0.95,
+    metalness: 0
+  });
+  track = new THREE.Mesh(trackGeo, trackMat);
+  track.rotation.x = -Math.PI / 2;
+  track.receiveShadow = true;
+  scene.add(track);
+
+  // Lignes blanches de la piste
+  for (let i = 0; i < 6; i++) {
+    const x = -4 + i * 1.6;
+    const lineGeo = new THREE.PlaneGeometry(0.15, 500);
+    const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const line = new THREE.Mesh(lineGeo, lineMat);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(x, 0.02, 0);
+    scene.add(line);
+  }
+
+  // Bordures de piste
+  for (let side of [-5.5, 5.5]) {
+    const borderGeo = new THREE.BoxGeometry(1, 0.3, 500);
+    const borderMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const border = new THREE.Mesh(borderGeo, borderMat);
+    border.position.set(side, 0.15, 0);
+    border.castShadow = true;
+    border.receiveShadow = true;
+    scene.add(border);
+  }
+
+  // Herbe autour de la piste avec variation
+  for (let side of [-30, 30]) {
+    const grassGeo = new THREE.PlaneGeometry(40, 500, 20, 50);
+    const positions = grassGeo.attributes.position.array;
+    for (let i = 0; i < positions.length; i += 3) {
+      positions[i + 2] += (Math.random() - 0.5) * 0.3;
+    }
+    grassGeo.attributes.position.needsUpdate = true;
+    
+    const grassMat = new THREE.MeshStandardMaterial({ 
+      color: 0x1b5e20,
+      roughness: 1,
+      flatShading: true
+    });
+    const grass = new THREE.Mesh(grassGeo, grassMat);
+    grass.rotation.x = -Math.PI / 2;
+    grass.position.x = side;
+    grass.receiveShadow = true;
+    scene.add(grass);
+  }
+
+  // Tribunes olympiques
+  createStadium();
+
+  // Drapeaux olympiques
+  createOlympicFlags();
+
+  // Foule
+  createCrowd();
+
+  // Events
+  document.addEventListener('keydown', onKeyDown);
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('retry-btn').addEventListener('click', restartGame);
+  window.addEventListener('resize', onWindowResize);
+
+  animate();
+}
+
+function createStadium() {
+  // Tribunes à gauche
+  for (let i = -200; i < 200; i += 80) { // step augmenté
+    const standGeo = new THREE.BoxGeometry(12, 10, 30);
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x424242, roughness: 0.8 });
+    const stand = new THREE.Mesh(standGeo, standMat);
+    stand.position.set(-20, 5, i);
+    scene.add(stand);
+
+    // Moins de rangées de sièges
+    for (let row = 0; row < 2; row++) {
+      const seatsGeo = new THREE.BoxGeometry(11, 0.5, 28);
+      const colors = [0xff5252, 0x448aff, 0xffeb3b, 0x69f0ae];
+      const seatsMat = new THREE.MeshStandardMaterial({ color: colors[row % colors.length] });
+      const seats = new THREE.Mesh(seatsGeo, seatsMat);
+      seats.position.set(-20, 3 + row * 3, i);
+      scene.add(seats);
+    }
+  }
+
+  // Tribunes à droite (réduction identique)
+  for (let i = -200; i < 200; i += 80) {
+    const standGeo = new THREE.BoxGeometry(12, 10, 30);
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x424242, roughness: 0.8 });
+    const stand = new THREE.Mesh(standGeo, standMat);
+    stand.position.set(20, 5, i);
+    scene.add(stand);
+
+    for (let row = 0; row < 2; row++) {
+      const seatsGeo = new THREE.BoxGeometry(11, 0.5, 28);
+      const colors = [0xff5252, 0x448aff, 0xffeb3b, 0x69f0ae];
+      const seatsMat = new THREE.MeshStandardMaterial({ color: colors[row % colors.length] });
+      const seats = new THREE.Mesh(seatsGeo, seatsMat);
+      seats.position.set(20, 3 + row * 3, i);
+      scene.add(seats);
+    }
+  }
+}
+
+function createOlympicFlags() {
+  const flagPositions = [-15, 15];
+  const colors = [0x0085c7, 0xffd700, 0x000000, 0x009f3d, 0xdf0024];
+  
+  // moins de drapeaux (espacement augmenté)
+  for (let side of flagPositions) {
+    for (let i = -180; i < 180; i += 60) { // step augmenté
+      const poleGeo = new THREE.CylinderGeometry(0.08, 0.08, 6, 6);
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x808080 });
+      const pole = new THREE.Mesh(poleGeo, poleMat);
+      pole.position.set(side, 3.5, i);
+      scene.add(pole);
+
+      const flagColor = colors[Math.floor(Math.random() * colors.length)];
+      const flagGeo = new THREE.PlaneGeometry(2.5, 1.6);
+      const flagMat = new THREE.MeshStandardMaterial({ color: flagColor, side: THREE.DoubleSide });
+      const flag = new THREE.Mesh(flagGeo, flagMat);
+      flag.position.set(side + (side > 0 ? -1.2 : 1.2), 6, i);
+      flag.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
+      scene.add(flag);
+    }
+  }
+}
+
+function createCrowd() {
+  // beaucoup moins d'entités pour la foule
+  for (let side of [-18, 18]) {
+    for (let i = -200; i < 200; i += 20) { // step augmenté
+      for (let row = 0; row < 2; row++) { // moins de lignes
+        const personGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.9, 6);
+        const colors = [0xff5252, 0x448aff, 0xffeb3b, 0x69f0ae, 0xff4081];
+        const personMat = new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random() * colors.length)] });
+        const person = new THREE.Mesh(personGeo, personMat);
+        person.position.set(
+          side + (Math.random() - 0.5) * 6,
+          3 + row * 2.5,
+          i + (Math.random() - 0.5) * 3
+        );
+        crowds.push(person);
+        scene.add(person);
+      }
+    }
+  }
+}
+
+function createHurdle(z) {
+  const hurdleGroup = new THREE.Group();
+  
+  // Base avec poids
+  for (let x of [-3, 3]) {
+    const baseGeo = new THREE.CylinderGeometry(0.3, 0.4, 0.2, 8);
+    const baseMat = new THREE.MeshStandardMaterial({ 
+      color: 0x212121,
+      metalness: 0.6,
+      roughness: 0.4
+    });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.set(x, 0.1, 0);
+    base.castShadow = true;
+    hurdleGroup.add(base);
+    
+    // Poteaux
+    const poleGeo = new THREE.CylinderGeometry(0.08, 0.08, HURDLE_HEIGHT, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ 
+      color: 0xfafafa,
+      metalness: 0.3,
+      roughness: 0.7
+    });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(x, HURDLE_HEIGHT / 2, 0);
+    pole.castShadow = true;
+    hurdleGroup.add(pole);
+  }
+  
+  // Barre à sauter avec effet lumineux
+  const barGeo = new THREE.BoxGeometry(6.2, 0.1, 0.1);
+  const barMat = new THREE.MeshStandardMaterial({ 
+    color: 0xffd700,
+    metalness: 0.9,
+    roughness: 0.1,
+    emissive: 0xffa000,
+    emissiveIntensity: 0.4
+  });
+  const bar = new THREE.Mesh(barGeo, barMat);
+  bar.position.y = HURDLE_HEIGHT * 0.88;
+  bar.castShadow = true;
+  hurdleGroup.add(bar);
+  
+  // Lumière sur la haie
+  const hurdleLight = new THREE.PointLight(0xffd700, 0.5, 5);
+  hurdleLight.position.y = HURDLE_HEIGHT * 0.88;
+  hurdleGroup.add(hurdleLight);
+  
+  hurdleGroup.position.set(0, 0, z);
+  hurdleGroup.userData = { passed: false, active: true, light: hurdleLight };
+  
+  scene.add(hurdleGroup);
+  hurdles.push(hurdleGroup);
+}
+
+function createParticles(pos, color) {
+  // moins de particules pour alléger
+  for (let i = 0; i < 6; i++) { // reduced from 15
+    const particleGeo = new THREE.SphereGeometry(0.08, 6, 4); // low-poly
+    const particleMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1 });
+    const particle = new THREE.Mesh(particleGeo, particleMat);
+    particle.position.copy(pos);
+    particle.position.x += (Math.random() - 0.5) * 1.2;
+    particle.position.y += Math.random() * 0.6;
+    
+    const vel = new THREE.Vector3(
+      (Math.random() - 0.5) * 0.12,
+      Math.random() * 0.18,
+      (Math.random() - 0.5) * 0.12
+    );
+    
+    scene.add(particle);
+    particles.push({ mesh: particle, velocity: vel, life: 40 });
+  }
+}
+
+function startGame() {
+  // Cacher l'écran d'instructions et afficher l'UI
+  document.getElementById('instructions').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+
+  // Réinitialiser états de partie
+  isGameRunning = true;
+  score = 0;
+  hurdlesCleared = 0;
+  faults = 0;
+  speed = 1;
+  hurdleSpawnTimer = 0;
+  nextHurdleDistance = 30;
+
+  updateUI();
+
+  // Première haie
+  createHurdle(-40);
+}
+
+function restartGame() {
+  // Nettoyer les haies
+  hurdles.forEach(h => scene.remove(h));
+  hurdles = [];
+  
+  document.getElementById('game-over').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  
+  camera.position.set(0, PLAYER_HEIGHT, 0);
+  jumpHeight = 0;
+  isJumping = false;
+  
+  startGame();
+}
+
+function onKeyDown(event) {
+  if (!isGameRunning) return;
+  
+  if (event.code === 'Space' && !isJumping) {
+    isJumping = true;
+    jumpVelocity = JUMP_POWER;
+  }
+}
+
+function updateUI() {
+  document.getElementById('score').textContent = score;
+  document.getElementById('speed').textContent = speed.toFixed(1) + 'x';
+  document.getElementById('hurdles-count').textContent = hurdlesCleared;
+  
+  for (let i = 1; i <= 3; i++) {
+    const faultIcon = document.getElementById('fault' + i);
+    if (i <= faults) {
+      faultIcon.classList.add('lost');
+    } else {
+      faultIcon.classList.remove('lost');
+    }
+  }
+}
+
+function gameOver() {
+  isGameRunning = false;
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('game-over').style.display = 'block';
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('final-hurdles').textContent = Math.floor(score / 10);
+  
+  if (score > bestScore) {
+    bestScore = score;
+  }
+  document.getElementById('best-score').textContent = bestScore;
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  frameCounter++;
+
+  if (isGameRunning) {
+    const currentSpeed = baseSpeed * speed;
+    
+    // Gestion du saut
+    if (isJumping) {
+      jumpVelocity -= GRAVITY;
+      jumpHeight += jumpVelocity;
+      
+      if (jumpHeight <= 0) {
+        jumpHeight = 0;
+        isJumping = false;
+        jumpVelocity = 0;
+        cameraShake = 0.06; // reduced shake
+      }
+    }
+    
+    // Shake de caméra
+    if (cameraShake > 0) {
+      camera.position.x = (Math.random() - 0.5) * cameraShake;
+      cameraShake *= 0.85;
+    }
+    
+    camera.position.y = PLAYER_HEIGHT + jumpHeight;
+    
+    // Déplacement et gestion des haies
+    for (let index = hurdles.length - 1; index >= 0; index--) {
+      const hurdle = hurdles[index];
+      hurdle.position.z += currentSpeed;
+      
+      if (hurdle.userData.light) {
+        hurdle.userData.light.intensity = 0.45 + Math.sin(Date.now() * 0.005) * 0.25;
+      }
+      
+      if (!hurdle.userData.passed && hurdle.position.z > 2) {
+        hurdle.userData.passed = true;
+        hurdlesCleared++;
+        score += 10;
+        speed += 0.03; // moindre augmentation
+        updateUI();
+        createParticles(new THREE.Vector3(0, 1, 2), 0x4caf50);
+      }
+      
+      if (hurdle.userData.active && hurdle.position.z > -1.5 && hurdle.position.z < 1.5 && jumpHeight < HURDLE_HEIGHT * 0.65) {
+        hurdle.userData.active = false;
+        faults++;
+        updateUI();
+        cameraShake = 0.18;
+        createParticles(new THREE.Vector3(0, 1, 0), 0xff5252);
+        const originalColor = scene.background.clone();
+        scene.background = new THREE.Color(0xff0000);
+        setTimeout(() => { scene.background = originalColor; }, 80);
+        if (faults >= 3) gameOver();
+      }
+      
+      if (hurdle.position.z > 50) {
+        scene.remove(hurdle);
+        hurdles.splice(index, 1);
+      }
+    }
+
+    // Particules (allégées)
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life--;
+      p.mesh.position.add(p.velocity);
+      p.velocity.y -= 0.008;
+      p.mesh.material.opacity = Math.max(0, p.life / 40);
+      if (p.life <= 0) {
+        scene.remove(p.mesh);
+        particles.splice(i, 1);
+      }
+    }
+    
+    // Spawn des haies (inchangé mais safe)
+    hurdleSpawnTimer++;
+    const spawnInterval = Math.max(60, 140 - score);
+    if (hurdleSpawnTimer > spawnInterval) {
+      hurdleSpawnTimer = 0;
+      const randomZ = -50 - Math.random() * 30;
+      createHurdle(randomZ);
+    }
+    
+    // Animation de la foule — mise à jour moins fréquente
+    if (frameCounter % 3 === 0) { // every 3 frames
+      for (let i = 0; i < crowds.length; i++) {
+        const person = crowds[i];
+        person.rotation.y = Math.sin(Date.now() * 0.001 + i) * 0.25;
+        person.scale.y = 1 + Math.sin(Date.now() * 0.002 + i) * 0.06;
+      }
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+// Appel de l'initialisation de la scène
+init();
+</script>
+</body>
+</html>

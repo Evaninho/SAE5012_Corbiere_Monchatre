@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Natation Olympique 3D</title>
+<style>
+body { 
+  margin: 0; 
+  font-family: 'Arial', sans-serif; 
+  overflow: hidden;
+  background: #000;
+}
+
+#hud {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: linear-gradient(135deg, rgba(0,100,200,0.9), rgba(0,50,150,0.9));
+  padding: 20px 40px;
+  border-radius: 15px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  color: white;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,255,255,0.2);
+  display: none;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-around;
+  gap: 40px;
+  margin-bottom: 15px;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 5px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #4fc3f7;
+  text-shadow: 0 0 15px rgba(79,195,247,0.6);
+}
+
+@keyframes pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.1); }
+}
+
+#instructions {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(0,100,200,0.95), rgba(0,50,150,0.95));
+  padding: 50px 70px;
+  border-radius: 20px;
+  color: white;
+  text-align: center;
+  z-index: 20;
+  border: 3px solid rgba(255,255,255,0.3);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+#instructions h1 {
+  margin: 0 0 20px 0;
+  font-size: 48px;
+  color: #4fc3f7;
+  text-shadow: 0 0 20px rgba(79,195,247,0.6);
+}
+
+#instructions p {
+  font-size: 20px;
+  margin: 15px 0;
+  line-height: 1.6;
+}
+
+#instructions .key {
+  display: inline-block;
+  background: linear-gradient(135deg, #4fc3f7, #2196f3);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: bold;
+  font-size: 24px;
+  margin: 10px 5px;
+  box-shadow: 0 4px 15px rgba(79,195,247,0.4);
+}
+
+#start-btn {
+  margin-top: 30px;
+  padding: 20px 50px;
+  font-size: 24px;
+  background: linear-gradient(135deg, #4fc3f7, #2196f3);
+  color: white;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 5px 25px rgba(79,195,247,0.5);
+  transition: all 0.3s;
+}
+
+#start-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(79,195,247,0.7);
+}
+
+#game-over {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(33,150,243,0.95), rgba(25,118,210,0.95));
+  padding: 50px 70px;
+  border-radius: 20px;
+  color: white;
+  text-align: center;
+  z-index: 20;
+  display: none;
+  border: 3px solid rgba(255,255,255,0.3);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+}
+
+#game-over h1 {
+  margin: 0 0 20px 0;
+  font-size: 52px;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+#game-over p {
+  font-size: 24px;
+  margin: 15px 0;
+}
+
+.btn-group {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.btn {
+  padding: 15px 40px;
+  font-size: 20px;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+
+#retry-btn {
+  background: linear-gradient(135deg, #4caf50, #8bc34a);
+  color: white;
+  box-shadow: 0 5px 25px rgba(76,175,80,0.5);
+}
+
+#retry-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(76,175,80,0.7);
+}
+
+#menu-btn {
+  background: linear-gradient(135deg, #666, #999);
+  color: white;
+  box-shadow: 0 5px 25px rgba(0,0,0,0.3);
+}
+
+#menu-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+}
+
+#back-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 2px solid white;
+  padding: 12px 25px;
+  font-size: 16px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+  z-index: 15;
+}
+
+#back-btn:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+
+canvas { display: block; }
+</style>
+</head>
+<body>
+<button id="back-btn" onclick="goBack()">← Menu</button>
+
+<div id="hud">
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-label">📍 DISTANCE</div>
+      <div class="stat-value" id="distance">0m</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">⚡ VITESSE</div>
+      <div class="stat-value" id="speed">0.0</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">⏱️ TEMPS</div>
+      <div class="stat-value" id="time">0.0s</div>
+    </div>
+  </div>
+</div>
+
+
+<div id="instructions">
+  <h1>🏊‍♂️ NATATION 100M</h1>
+  <p>Nagez le plus vite possible !</p>
+  <p>Cliquez rapidement ou appuyez sur <span class="key">ESPACE</span></p>
+  <p>Plus vous cliquez vite, plus vous nagez vite !</p>
+  <button id="start-btn">🚀 COMMENCER</button>
+</div>
+
+<div id="game-over">
+  <h1>🏁 ARRIVÉE !</h1>
+  <p>Temps: <span id="final-time">0.0</span>s</p>
+  <p id="medal-text"></p>
+  <p>Meilleur temps: <span id="best-time">--</span>s</p>
+  <div class="btn-group">
+    <button id="retry-btn" class="btn">🔄 RECOMMENCER</button>
+    <button id="menu-btn" class="btn" onclick="goBack()">📋 MENU</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+let scene, camera, renderer, swimmer, pool, lanes = [], bubbles = [];
+let isGameRunning = false;
+let distance = 0;
+let speed = 0;
+let time = 0;
+let lastClick = 0;
+let clickCount = 0;
+let bestTime = null;
+
+const POOL_LENGTH = 100;
+const MIN_CLICK_INTERVAL = 100;
+
+function init() {
+  // Scene
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 30, 120);
+
+  // Camera (vue de derrière le nageur)
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 5, -10);
+  camera.lookAt(0, 0, 0);
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  // Lumières
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+
+  const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  sunLight.position.set(5, 10, 0);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 2048;
+  sunLight.shadow.mapSize.height = 2048;
+  scene.add(sunLight);
+
+  // Piscine
+  const poolGeo = new THREE.BoxGeometry(10, 3, POOL_LENGTH * 2 + 20);
+  const poolMat = new THREE.MeshStandardMaterial({ 
+    color: 0x0077be,
+    transparent: true,
+    opacity: 0.7,
+    roughness: 0.1,
+    metalness: 0.3
+  });
+  pool = new THREE.Mesh(poolGeo, poolMat);
+  pool.position.y = -1.5;
+  pool.position.z = 10;
+  pool.receiveShadow = true;
+  scene.add(pool);
+
+  // Fond de la piscine
+  const bottomGeo = new THREE.PlaneGeometry(10, POOL_LENGTH * 2 + 20);
+  const bottomMat = new THREE.MeshStandardMaterial({ 
+    color: 0x4fc3f7,
+    roughness: 0.9
+  });
+  const bottom = new THREE.Mesh(bottomGeo, bottomMat);
+  bottom.rotation.x = -Math.PI / 2;
+  bottom.position.y = -3;
+  bottom.position.z = 10;
+  bottom.receiveShadow = true;
+  scene.add(bottom);
+
+  // Lignes de couloir
+  for (let i = 0; i < 6; i++) {
+    const x = -4 + i * 1.6;
+    const laneGeo = new THREE.CylinderGeometry(0.05, 0.05, POOL_LENGTH * 2 + 20, 8);
+    const colors = [0xff0000, 0x0000ff, 0xffff00, 0xff0000, 0x0000ff, 0xffff00];
+    const laneMat = new THREE.MeshStandardMaterial({ color: colors[i] });
+    const lane = new THREE.Mesh(laneGeo, laneMat);
+    lane.rotation.x = Math.PI / 2;
+    lane.position.set(x, -0.5, 10);
+    scene.add(lane);
+    lanes.push(lane);
+  }
+
+  // Ligne de départ
+  const startGeo = new THREE.BoxGeometry(10, 0.3, 0.5);
+  const startMat = new THREE.MeshStandardMaterial({ 
+    color: 0xffffff,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.3
+  });
+  const startLine = new THREE.Mesh(startGeo, startMat);
+  startLine.position.set(0, 0, -5);
+  scene.add(startLine);
+
+  // Nageur
+  const swimmerGroup = new THREE.Group();
+  
+  // Corps orienté vers l'avant
+  const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.5, 8);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff6b6b });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.rotation.x = Math.PI / 2;
+  body.castShadow = true;
+  swimmerGroup.add(body);
+
+  // Tête
+  const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xffcba4 });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.z = 0.9;
+  head.castShadow = true;
+  swimmerGroup.add(head);
+
+  // Bonnet de bain
+  const capGeo = new THREE.SphereGeometry(0.37, 16, 16, 0, Math.PI);
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x2196f3 });
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.position.copy(head.position);
+  cap.rotation.x = Math.PI / 2;
+  swimmerGroup.add(cap);
+
+  // Bras gauche
+  const armGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 8);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0xffcba4 });
+  const leftArm = new THREE.Mesh(armGeo, armMat);
+  leftArm.position.set(-0.4, 0, 0.3);
+  leftArm.rotation.x = Math.PI / 3;
+  leftArm.rotation.z = -Math.PI / 6;
+  leftArm.castShadow = true;
+  swimmerGroup.add(leftArm);
+  
+  // Bras droit
+  const rightArm = leftArm.clone();
+  rightArm.position.set(0.4, 0, 0.3);
+  rightArm.rotation.z = Math.PI / 6;
+  swimmerGroup.add(rightArm);
+
+  // Jambes
+  const legGeo = new THREE.CylinderGeometry(0.1, 0.08, 1, 8);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0xff6b6b });
+  const leftLeg = new THREE.Mesh(legGeo, legMat);
+  leftLeg.position.set(-0.15, 0, -0.8);
+  leftLeg.rotation.x = -Math.PI / 6;
+  leftLeg.castShadow = true;
+  swimmerGroup.add(leftLeg);
+  
+  const rightLeg = leftLeg.clone();
+  rightLeg.position.set(0.15, 0, -0.8);
+  swimmerGroup.add(rightLeg);
+
+  swimmerGroup.position.set(0, 0, -4);
+  swimmerGroup.userData = { leftArm, rightArm, leftLeg, rightLeg };
+  scene.add(swimmerGroup);
+  swimmer = swimmerGroup;
+
+  // Murs de la piscine
+  const wallGeo = new THREE.BoxGeometry(0.5, 2, POOL_LENGTH * 2 + 20);
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x1976d2 });
+  
+  const leftWall = new THREE.Mesh(wallGeo, wallMat);
+  leftWall.position.set(-5.25, 0, 10);
+  leftWall.castShadow = true;
+  scene.add(leftWall);
+  
+  const rightWall = leftWall.clone();
+  rightWall.position.set(5.25, 0, 10);
+  scene.add(rightWall);
+
+  // Zone d'arrivée avec mur
+  const finishAreaGeo = new THREE.BoxGeometry(10, 4, 3);
+  const finishAreaMat = new THREE.MeshStandardMaterial({ 
+    color: 0x1565c0,
+    roughness: 0.8
+  });
+  const finishArea = new THREE.Mesh(finishAreaGeo, finishAreaMat);
+  finishArea.position.set(0, 0, POOL_LENGTH + 11);
+  finishArea.castShadow = true;
+  scene.add(finishArea);
+
+  // Ligne d'arrivée
+  const finishGeo = new THREE.BoxGeometry(10, 0.3, 0.5);
+  const finishMat = new THREE.MeshStandardMaterial({ 
+    color: 0xff0000,
+    emissive: 0xff0000,
+    emissiveIntensity: 0.5
+  });
+  const finish = new THREE.Mesh(finishGeo, finishMat);
+  finish.position.set(0, 0, POOL_LENGTH + 5);
+  scene.add(finish);
+
+  // Panneau "ARRIVÉE"
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ff0000';
+  ctx.fillRect(0, 0, 512, 128);
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 80px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('ARRIVÉE', 256, 90);
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  const signMat = new THREE.MeshBasicMaterial({ map: texture });
+  const signGeo = new THREE.PlaneGeometry(8, 2);
+  const sign = new THREE.Mesh(signGeo, signMat);
+  sign.position.set(0, 3, POOL_LENGTH + 10);
+  sign.rotation.y = Math.PI;
+  scene.add(sign);
+
+  // Mure 
+  for (let side of [-18, 18]) {
+    const standGeo = new THREE.BoxGeometry(1, 18, POOL_LENGTH * 2.3 + 20);
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x424242 });
+    const stand = new THREE.Mesh(standGeo, standMat);
+    stand.position.set(side, 3, 10);
+    stand.castShadow = true;
+    scene.add(stand);
+  }
+   // sol 
+   for (let side of [-14, 14]) {
+    const standGeo = new THREE.BoxGeometry(16, 1, POOL_LENGTH * 2.5 + 20);
+    const standMat = new THREE.MeshStandardMaterial({ color: 0x424242 });
+    const stand = new THREE.Mesh(standGeo, standMat);
+    stand.position.set(side, -0.5, 0);
+    stand.rotation.set(0, 0, 0);
+    stand.castShadow = true;
+    scene.add(stand);
+  }
+  // Mure du fond
+  const standGeo = new THREE.BoxGeometry(40, 18, 0);
+  const standMat = new THREE.MeshStandardMaterial({ color: 0x1f4242 });
+  const stand = new THREE.Mesh(standGeo, standMat);
+  stand.position.set(0, 3, 130);
+  stand.rotation.set(0, 0, 0);
+  stand.castShadow = true;
+  scene.add(stand);
+
+    // Plafond
+  const plafGeo = new THREE.BoxGeometry(40, 1, 200);
+  const plafMat = new THREE.MeshStandardMaterial({ color: 0x1f4242 });
+  const plaf = new THREE.Mesh(plafGeo, plafMat);
+  plaf.position.set(0, 12, 80);
+  plaf.rotation.set(0, 0, 0);
+  plaf.castShadow = true;
+  scene.add(plaf);
+
+
+
+  // Events
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('click', onMouseClick);
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('retry-btn').addEventListener('click', restartGame);
+  window.addEventListener('resize', onWindowResize);
+
+  animate();
+}
+
+function onKeyDown(event) {
+  if (!isGameRunning) return;
+  if (event.code === 'Space') {
+    stroke();
+  }
+}
+
+function onMouseClick() {
+  if (isGameRunning) {
+    stroke();
+  }
+}
+
+function stroke() {
+  const now = Date.now();
+  if (now - lastClick < MIN_CLICK_INTERVAL) return;
+  lastClick = now;
+  
+  clickCount++;
+  speed = Math.min(speed + 0.12, 0.7);
+  createBubbles();
+  
+  // Animation des bras alternés
+  const leftArm = swimmer.userData.leftArm;
+  const rightArm = swimmer.userData.rightArm;
+  
+  if (clickCount % 2 === 0) {
+    leftArm.rotation.x = Math.PI / 2;
+    rightArm.rotation.x = Math.PI / 3;
+  } else {
+    leftArm.rotation.x = Math.PI / 3;
+    rightArm.rotation.x = Math.PI / 2;
+  }
+}
+
+function createBubbles() {
+  for (let i = 0; i < 8; i++) {
+    const bubbleGeo = new THREE.SphereGeometry(0.08 + Math.random() * 0.1, 6, 6);
+    const bubbleMat = new THREE.MeshBasicMaterial({ 
+      color: 0x4fc3f7,
+      transparent: true,
+      opacity: 0.7
+    });
+    const bubble = new THREE.Mesh(bubbleGeo, bubbleMat);
+    bubble.position.copy(swimmer.position);
+    bubble.position.x += (Math.random() - 0.5) * 0.8;
+    bubble.position.y += (Math.random() - 0.5) * 0.3 - 0.3;
+    bubble.position.z -= 0.5;
+    
+    scene.add(bubble);
+    bubbles.push({
+      mesh: bubble,
+      velocity: new THREE.Vector3(
+        (Math.random() - 0.5) * 0.02,
+        Math.random() * 0.04 + 0.02,
+        (Math.random() - 0.5) * 0.02
+      ),
+      life: 60
+    });
+  }
+}
+
+function startGame() {
+  document.getElementById('instructions').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  isGameRunning = true;
+  distance = 0;
+  speed = 0;
+  time = 0;
+  clickCount = 0;
+  swimmer.position.set(0, 0, -4);
+}
+
+function restartGame() {
+  bubbles.forEach(b => scene.remove(b.mesh));
+  bubbles = [];
+  
+  document.getElementById('game-over').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  
+  startGame();
+}
+
+function goBack() {
+  window.location.href = 'menu.html';
+}
+
+function gameOver() {
+  isGameRunning = false;
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('game-over').style.display = 'block';
+  document.getElementById('final-time').textContent = time.toFixed(2);
+  
+  if (bestTime === null || time < bestTime) {
+    bestTime = time;
+  }
+  document.getElementById('best-time').textContent = bestTime.toFixed(2);
+  
+  const medalText = document.getElementById('medal-text');
+  if (time < 4) {
+    medalText.textContent = '🥇 MÉDAILLE D\'OR ! Record Olympique !';
+    medalText.style.color = '#ffd700';
+  } else if (time < 5) {
+    medalText.textContent = '🥈 MÉDAILLE D\'ARGENT ! Excellent !';
+    medalText.style.color = '#c0c0c0';
+  } else if (time < 9) {
+    medalText.textContent = '🥉 MÉDAILLE DE BRONZE ! Bien joué !';
+    medalText.style.color = '#cd7f32';
+  } else {
+    medalText.textContent = '👍 Bon effort ! Réessayez !';
+    medalText.style.color = '#fff';
+  }
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (isGameRunning) {
+    time += 0.016;
+    
+    // Décélération progressive
+    speed *= 0.97;
+    
+    distance += speed;
+    swimmer.position.z += speed;
+    
+    // Mouvement réaliste de nage
+    const swimTime = Date.now() * 0.005;
+    swimmer.rotation.x = Math.sin(swimTime) * 0.08;
+    swimmer.position.y = Math.sin(swimTime * 1.5) * 0.15;
+    swimmer.position.x = Math.sin(swimTime * 0.7) * 0.1;
+    
+    // Animation des jambes
+    const leftLeg = swimmer.userData.leftLeg;
+    const rightLeg = swimmer.userData.rightLeg;
+    leftLeg.rotation.x = -Math.PI / 6 + Math.sin(swimTime * 2) * 0.3;
+    rightLeg.rotation.x = -Math.PI / 6 + Math.sin(swimTime * 2 + Math.PI) * 0.3;
+    
+    // Camera suit le nageur
+    camera.position.z = swimmer.position.z - 10;
+    camera.position.y = 5;
+    camera.lookAt(swimmer.position.x, swimmer.position.y, swimmer.position.z + 5);
+    
+    // UI
+    document.getElementById('distance').textContent = Math.floor(distance) + 'm';
+    document.getElementById('speed').textContent = (speed * 80).toFixed(1);
+    document.getElementById('time').textContent = time.toFixed(1) + 's';
+    
+    // Fin de course
+    if (swimmer.position.z >= POOL_LENGTH + 4) {
+      swimmer.position.z = POOL_LENGTH + 4;
+      speed = 0;
+      gameOver();
+    }
+    
+    // Bulles
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      const b = bubbles[i];
+      b.mesh.position.add(b.velocity);
+      b.life--;
+      b.mesh.material.opacity = b.life / 60 * 0.7;
+      
+      if (b.life <= 0 || b.mesh.position.y > 2) {
+        scene.remove(b.mesh);
+        bubbles.splice(i, 1);
+      }
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -13,6 +13,9 @@ import { RegisterForm } from './components/auth/RegisterForm.jsx'
 import { HomePage } from './pages/HomePage.jsx'
 import { StatsPage } from './pages/StatsPage.jsx'
 import { NewsPage } from './pages/NewsPage.jsx'
+import { NewsPage2 } from './pages/NewsPage2.jsx'
+import { NewsPage3 } from './pages/NewsPage3.jsx'
+
 import { GameIntroPage } from './pages/GameIntroPage.jsx'
 import { ContactPage } from './pages/ContactPage.jsx'
 import { AccountPage } from './pages/AccountPage.jsx' 
@@ -29,14 +32,17 @@ function App() {
       <Navbar />
       {/* <LoginForm />
       <RegisterForm /> */}
+      {/* <NewsPage /> */}
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/statistique" element={<StatsPage />} />
-        <Route path="/actualite" element={<NewsPage />} />
+        <Route path="/statistiques" element={<StatsPage />} />
+        <Route path="/actualites" element={<NewsPage3 />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/compte" element={<AccountPage />} />
         <Route path="/login" element={<LoginForm />} />
         <Route path="/register" element={<RegisterForm />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/jeux" element={<GameIntroPage />} />
       </Routes>
       <Footer />
     </>

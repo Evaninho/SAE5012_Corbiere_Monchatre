@@ -139,6 +139,8 @@ export function Navbar() {
     { to: "/statistiques", label: "Statistiques" },
     { to: "/actualites", label: "Actualités" },
     { to: "/contact", label: "Contact" },
+    { to: "/jeux", label: "Jeux" },
+
   ];
 
   const isActive = (path) => {
