@@ -121,6 +121,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->id;
     }
 
+    public function getUsername(): ?string
+    {
+        return $this->email;
+    }
+
     public function getEmail(): ?string
     {
         return $this->email;
@@ -212,7 +217,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @param list<string> $roles
      */
-    public function setRoles(array $roles): static
+        public function setRoles(array $roles): static
     {
         $this->roles = $roles;
 
