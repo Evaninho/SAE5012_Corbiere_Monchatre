@@ -13,8 +13,12 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: ArticleRepository::class)]
 #[ApiResource(
     operations: [
-        new Get(),
-        new GetCollection(),
+        new Get(
+            security: "true"
+        ),
+        new GetCollection(
+            security: "true"
+        ),
         new Post(
             security: "is_granted('ROLE_USER')"
         ),

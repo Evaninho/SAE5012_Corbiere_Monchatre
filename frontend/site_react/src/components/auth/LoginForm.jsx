@@ -5,84 +5,27 @@ import logoImage from "../image/LOGO_OFFI.png";
 export function LoginForm() {
     const navigate = useNavigate();
 
-    // État pour les données du formulaire
     const [formData, setFormData] = useState({
         email: "",
         password: "",
-        rememberMe: false
+        rememberMe: false,
     });
 
-    // État pour les erreurs
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // État pour le mot de passe oublié
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState("");
     const [resetSent, setResetSent] = useState(false);
 
-    // URL de votre API - À MODIFIER selon votre backend
-    const API_BASE_URL = 'http://localhost:8000/api'; 
+    const API_BASE_URL = "http://localhost:8000/api";
 
-    // Charger l'email sauvegardé au montage du composant
-    useEffect(() => {
-        const savedEmail = localStorage.getItem("rememberedEmail");
-        if (savedEmail) {
-            setFormData(prev => ({
-                ...prev,
-                email: savedEmail,
-                rememberMe: true
-            }));
-        }
-
-        // Vérifier si l'utilisateur est déjà connecté
-        const token = localStorage.getItem("authToken");
-        if (token) {
-            // Optionnel : vérifier si le token est valide
-            verifyToken(token);
-        }
-    }, []);
-
-    // Fonction pour vérifier la validité du token
-    const verifyToken = async (token) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/auth/verify`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                // Token valide, rediriger vers la page d'accueil
-                navigate('/');
-            } else {
-                // Token invalide, le supprimer
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('userData');
-            }
-        } catch (error) {
-            console.error('Erreur de vérification du token:', error);
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('userData');
-        }
-    };
-
-    // Styles (identiques à avant)
-
+    // Styles
     const pageStyle = {
+        minHeight: "80vh",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        width: "45vw",
-        margin: "0 auto",
-        paddingBottom: "8vh",
-        fontFamily: "Arial, sans-serif",
-        gap: "10px",
-        borderRadius: "25px",
-        padding: "60px",
+        fontFamily: "Arial, sans-serif"
     };
 
     const containerStyle = {
@@ -149,6 +92,35 @@ export function LoginForm() {
         marginTop: "5px"
     };
 
+    const checkboxContainerStyle = {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: "25px",
+        fontSize: "14px"
+    };
+
+    const checkboxLabelStyle = {
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        cursor: "pointer"
+    };
+
+    const checkboxStyle = {
+        width: "18px",
+        height: "18px",
+        cursor: "pointer"
+    };
+
+    const forgotLinkStyle = {
+        color: "#0085C7",
+        textDecoration: "none",
+        fontSize: "14px",
+        cursor: "pointer",
+        transition: "color 0.2s"
+    };
+
     const buttonStyle = {
         width: "100%",
         height: "50px",
@@ -209,12 +181,31 @@ export function LoginForm() {
         marginBottom: "20px"
     };
 
+    // Charger l'email sauvegardé
+    useEffect(() => {
+        const savedEmail = localStorage.getItem("rememberedEmail");
+        if (savedEmail) {
+            setFormData((prev) => ({
+                ...prev,
+                email: savedEmail,
+                rememberMe: true,
+            }));
+        }
+
+        // Vérifier si déjà connecté
+        const token = localStorage.getItem("authToken");
+        if (token) {
+            alert("Vous êtes déjà connecté !");
+            navigate("/");
+        }
+    }, [navigate]);
+
     // Gestion des changements
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData({
             ...formData,
-            [name]: type === "checkbox" ? checked : value
+            [name]: type === "checkbox" ? checked : value,
         });
         if (errors[name]) {
             setErrors({ ...errors, [name]: "" });
@@ -233,108 +224,96 @@ export function LoginForm() {
 
         if (!formData.password) {
             newErrors.password = "Le mot de passe est requis";
-        } else if (formData.password.length < 6) {
-            newErrors.password = "Le mot de passe doit contenir au moins 6 caractères";
         }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
-    // ========== FONCTION DE CONNEXION AVEC FETCH ==========
+    // LOGIN
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        // Validation du formulaire
-        if (!validateForm()) {
-            return;
-        }
+        if (!validateForm()) return;
 
         setIsSubmitting(true);
-        setErrors({}); // Réinitialiser les erreurs
+        setErrors({});
 
         try {
-            // Appel à l'API de connexion
-            const response = await fetch(`${API_BASE_URL}/auth/login`, {
-                method: 'POST',
+            const response = await fetch(`${API_BASE_URL}/login_check`, {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json'
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
                     email: formData.email,
-                    password: formData.password
-                })
+                    password: formData.password,
+                }),
             });
 
-            // Vérifier le statut de la réponse
             if (!response.ok) {
-                // Gérer les erreurs HTTP
-                if (response.status === 401) {
-                    throw new Error('Email ou mot de passe incorrect');
-                } else if (response.status === 404) {
-                    throw new Error('Utilisateur non trouvé');
-                } else if (response.status === 500) {
-                    throw new Error('Erreur serveur. Veuillez réessayer.');
-                } else {
-                    throw new Error('Erreur de connexion');
-                }
+                throw new Error("Email ou mot de passe incorrect");
             }
 
-            // Récupérer les données de la réponse
             const data = await response.json();
+            console.log("Réponse complète:", data);
 
-            console.log('Réponse API:', data);
+            // Stocker le token
+            localStorage.setItem("authToken", data.token);
 
-            // Vérifier que le token existe dans la réponse
-            if (!data.token) {
-                throw new Error('Token non reçu');
-            }
+            // Décoder le JWT pour récupérer les infos utilisateur
+            const payload = JSON.parse(atob(data.token.split('.')[1]));
+            // console.log("Payload JWT:", payload);
+            const userId = payload.id || payload.user_id || payload.sub;
+            // Récupérer les infos complètes de l'utilisateur depuis l'API
+            const userResponse = await fetch(`${API_BASE_URL}/users/3`, {
+                headers: {
+                    "Authorization": `Bearer ${data.token}`
+                }
+            });
 
-            // ========== STOCKAGE DES DONNÉES ==========
-
-            // 1. Stocker le token JWT
-            localStorage.setItem('authToken', data.token);
-
-            // 2. Stocker les informations de l'utilisateur
-            if (data.user) {
-                localStorage.setItem('userData', JSON.stringify(data.user));
-            }
-
-            // 3. Gérer "Se souvenir de moi"
-            if (formData.rememberMe) {
-                localStorage.setItem('rememberedEmail', formData.email);
+            let userData;
+            if (userResponse.ok) {
+                const userDataResponse = await userResponse.json();
+                userData = userDataResponse.data || userDataResponse;
+                console.log('ok');
+                
             } else {
-                localStorage.removeItem('rememberedEmail');
+                // Si l'API profile n'existe pas encore, créer un objet depuis le JWT
+                console.log('acestdomage');
+                
+                userData = {
+                    id: payload.id || payload.user_id,
+                    email: payload.username || formData.email,
+                    pseudo: payload.pseudo || payload.username?.split('@')[0] || "Utilisateur",
+                    prenom: payload.prenom || "",
+                    nom: payload.nom || "",
+                    roles: payload.roles || []
+                };
             }
 
-            // 4. Stocker la date de connexion (optionnel)
-            localStorage.setItem('loginTimestamp', Date.now().toString());
+            // Stocker les données utilisateur
+            localStorage.setItem("userData", JSON.stringify(userData));
+            // console.log("Données utilisateur stockées:", userData);
 
-            // ========== SUCCÈS ==========
-            console.log('Connexion réussie !');
-            console.log('Token:', data.token);
-            console.log('Utilisateur:', data.user);
+            // Gestion "Se souvenir de moi"
+            if (formData.rememberMe) {
+                localStorage.setItem("rememberedEmail", formData.email);
+            } else {
+                localStorage.removeItem("rememberedEmail");
+            }
 
-            // Afficher un message de succès (optionnel)
-            alert(`Bienvenue ${data.user?.name || data.user?.email || 'utilisateur'} !`);
-
-            // Redirection vers la page d'accueil ou dashboard
-            navigate('/');
+            alert(`Bienvenue ${userData.pseudo || userData.prenom || 'utilisateur'} !`);
+            navigate("/");
 
         } catch (error) {
-            // Gestion des erreurs
-            console.error('Erreur de connexion:', error);
-
-            setErrors({
-                general: error.message || 'Une erreur est survenue. Veuillez réessayer.'
-            });
-
+            console.error("Erreur login:", error);
+            setErrors({ general: error.message });
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    // ========== FONCTION DE RÉINITIALISATION DU MOT DE PASSE ==========
+    // Réinitialisation mot de passe
     const handlePasswordReset = async (e) => {
         e.preventDefault();
 
@@ -349,30 +328,20 @@ export function LoginForm() {
         }
 
         try {
-            // Appel à l'API de réinitialisation
             const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    email: resetEmail
-                })
+                body: JSON.stringify({ email: resetEmail })
             });
 
             if (!response.ok) {
-                if (response.status === 404) {
-                    throw new Error('Aucun compte trouvé avec cet email');
-                }
-                throw new Error('Erreur lors de l\'envoi de l\'email');
+                throw new Error('Erreur lors de l\'envoi');
             }
-
-            const data = await response.json();
-            console.log('Réinitialisation:', data);
 
             setResetSent(true);
 
-            // Fermer le modal après 3 secondes
             setTimeout(() => {
                 setShowForgotPassword(false);
                 setResetSent(false);
@@ -381,14 +350,8 @@ export function LoginForm() {
 
         } catch (error) {
             console.error("Erreur:", error);
-            alert(error.message || "Une erreur est survenue. Veuillez réessayer.");
+            alert(error.message || "Une erreur est survenue");
         }
-    };
-
-    // ========== FONCTION DE CONNEXION GOOGLE (optionnel) ==========
-    const handleGoogleLogin = () => {
-        // Redirection vers l'endpoint Google OAuth de votre backend
-        window.location.href = `${API_BASE_URL}/auth/google`;
     };
 
     return (
@@ -452,7 +415,30 @@ export function LoginForm() {
                         {errors.password && <div style={errorMessageStyle}>{errors.password}</div>}
                     </div>
 
-                    {/* Bouton de connexion */}
+                    {/* Se souvenir + Mot de passe oublié */}
+                    <div style={checkboxContainerStyle}>
+                        <label style={checkboxLabelStyle}>
+                            <input
+                                type="checkbox"
+                                name="rememberMe"
+                                checked={formData.rememberMe}
+                                onChange={handleChange}
+                                style={checkboxStyle}
+                            />
+                            <span>Se souvenir de moi</span>
+                        </label>
+
+                        <span
+                            style={forgotLinkStyle}
+                            onClick={() => setShowForgotPassword(true)}
+                            onMouseEnter={(e) => e.target.style.color = "#006ba3"}
+                            onMouseLeave={(e) => e.target.style.color = "#0085C7"}
+                        >
+                            Mot de passe oublié ?
+                        </span>
+                    </div>
+
+                    {/* Bouton connexion */}
                     <button
                         type="submit"
                         style={buttonStyle}
@@ -476,6 +462,89 @@ export function LoginForm() {
                     </Link>
                 </p>
             </div>
+
+            {/* Modal Mot de passe oublié */}
+            {showForgotPassword && (
+                <div
+                    style={modalOverlayStyle}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setShowForgotPassword(false);
+                            setResetSent(false);
+                            setResetEmail("");
+                        }
+                    }}
+                >
+                    <div style={modalStyle}>
+                        <h2 style={{ marginTop: 0, color: "#0085C7" }}>Mot de passe oublié</h2>
+
+                        {resetSent ? (
+                            <div style={successMessageStyle}>
+                                ✓ Un email de réinitialisation a été envoyé !
+                            </div>
+                        ) : (
+                            <>
+                                <p style={{ color: "#666", fontSize: "14px", marginBottom: "20px" }}>
+                                    Entrez votre adresse email et nous vous enverrons un lien pour réinitialiser votre mot de passe.
+                                </p>
+
+                                <form onSubmit={handlePasswordReset}>
+                                    <div style={inputGroupStyle}>
+                                        <label htmlFor="resetEmail" style={labelStyle}>
+                                            Email
+                                        </label>
+                                        <input
+                                            type="email"
+                                            id="resetEmail"
+                                            placeholder="votre@email.com"
+                                            value={resetEmail}
+                                            onChange={(e) => setResetEmail(e.target.value)}
+                                            style={inputStyle}
+                                        />
+                                    </div>
+
+                                    <div style={{ display: "flex", gap: "10px" }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowForgotPassword(false);
+                                                setResetEmail("");
+                                            }}
+                                            style={{
+                                                flex: 1,
+                                                padding: "12px",
+                                                border: "2px solid #0085C7",
+                                                backgroundColor: "white",
+                                                color: "#0085C7",
+                                                borderRadius: "10px",
+                                                cursor: "pointer",
+                                                fontWeight: "600"
+                                            }}
+                                        >
+                                            Annuler
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            style={{
+                                                flex: 1,
+                                                padding: "12px",
+                                                border: "none",
+                                                backgroundColor: "#0085C7",
+                                                color: "white",
+                                                borderRadius: "10px",
+                                                cursor: "pointer",
+                                                fontWeight: "600"
+                                            }}
+                                        >
+                                            Envoyer
+                                        </button>
+                                    </div>
+                                </form>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
