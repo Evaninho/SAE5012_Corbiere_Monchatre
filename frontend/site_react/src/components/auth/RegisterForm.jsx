@@ -20,7 +20,6 @@ export function RegisterForm() {
         passwordConfirm: "",
         pays: "France",
         sports: [],
-        roles: ["ROLE_USER"],
         acceptCGU: false
     });
 
@@ -330,30 +329,29 @@ export function RegisterForm() {
                     nom: formData.nom,          // Symfony attend lastName
                     email: formData.email,
                     pseudo: formData.username,
-                    password: formData.passwordConfirm,     // Sera hashé côté Symfony
+                    plainPassword: formData.password,     // Sera hashé côté Symfony
                     pays: formData.pays,
                     sportFavoris: formData.sports[0] || "",
-                    roles: formData.roles
                 })
             });
             console.log('status : ', response.status)
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                if (response.status === 400) {
-                    // Erreur de validation
-                    throw new Error(errorData.message || 'Données invalides');
-                } else if (response.status === 409) {
-                    // Email ou username déjà utilisé
-                    throw new Error('Cet email ou nom d\'utilisateur existe déjà');
-                }
-                throw new Error('Erreur lors de l\'inscription');
-            }
             // if (!response.ok) {
-            //     const error = await response.json();
-            //     console.error("Erreur API:", error);
-            //     throw new Error(error['hydra:description'] || 'Erreur 400');
+            //     const errorData = await response.json();
+            //     if (response.status === 400) {
+            //         // Erreur de validation
+            //         throw new Error(errorData.message || 'Données invalides');
+            //     } else if (response.status === 409) {
+            //         // Email ou username déjà utilisé
+            //         throw new Error('Cet email ou nom d\'utilisateur existe déjà');
+            //     }
+            //     throw new Error('Erreur lors de l\'inscription');
             // }
+            if (!response.ok) {
+                const error = await response.json();
+                console.error("Erreur API:", error);
+                throw new Error(error['hydra:description'] || 'Erreur 400');
+            }
 
             // const data = await response.json();
 
