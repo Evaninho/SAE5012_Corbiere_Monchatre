@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import logoImage from "../image/LOGO_OFFI.png";
 
 export function LoginForm() {
@@ -13,6 +14,7 @@ export function LoginForm() {
 
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState("");
     const [resetSent, setResetSent] = useState(false);
@@ -79,6 +81,36 @@ export function LoginForm() {
         borderRadius: "10px",
         boxSizing: "border-box",
         transition: "border-color 0.2s"
+    };
+
+    const passwordContainer = {
+        position: 'relative',
+        width: '100%'
+    };
+
+    const inputPassword = {
+        width: "100%",
+        height: "45px",
+        padding: '10px 45px 10px 15px',
+        fontSize: "14px",
+        border: "1px solid #D9D9D9",
+        borderRadius: "10px",
+        boxSizing: "border-box",
+        transition: "border-color 0.2s"
+    };
+
+    const eyeButton = {
+        position: 'absolute',
+        right: '15px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '5px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
     };
 
     const inputErrorStyle = {
@@ -255,46 +287,31 @@ export function LoginForm() {
             }
 
             const data = await response.json();
-            console.log("Réponse complète:", data);
+            // console.log("Réponse complète:", data);
 
             // Stocker le token
             localStorage.setItem("authToken", data.token);
 
-            // Décoder le JWT pour récupérer les infos utilisateur
-            const payload = JSON.parse(atob(data.token.split('.')[1]));
-            // console.log("Payload JWT:", payload);
-            const userId = payload.id || payload.user_id || payload.sub;
-            // Récupérer les infos complètes de l'utilisateur depuis l'API
-            const userResponse = await fetch(`${API_BASE_URL}/users/3`, {
+            // Appel API /me
+
+            const meResponse = await fetch(`${API_BASE_URL}/me`, {
                 headers: {
-                    "Authorization": `Bearer ${data.token}`
+                    Authorization: `Bearer ${data.token}`
                 }
             });
+            // console.log("Status /api/me :", meResponse.status);
+            // console.log("teste :", meResponse);
 
-            let userData;
-            if (userResponse.ok) {
-                const userDataResponse = await userResponse.json();
-                userData = userDataResponse.data || userDataResponse;
-                console.log('ok');
-                
-            } else {
-                // Si l'API profile n'existe pas encore, créer un objet depuis le JWT
-                console.log('acestdomage');
-                
-                userData = {
-                    id: payload.id || payload.user_id,
-                    email: payload.username || formData.email,
-                    pseudo: payload.pseudo || payload.username?.split('@')[0] || "Utilisateur",
-                    prenom: payload.prenom || "",
-                    nom: payload.nom || "",
-                    roles: payload.roles || []
-                };
+
+            if (!meResponse.ok) {
+                throw new Error("Impossible de récupérer l'utilisateur");
             }
 
-            // Stocker les données utilisateur
-            localStorage.setItem("userData", JSON.stringify(userData));
-            // console.log("Données utilisateur stockées:", userData);
+            const userData = await meResponse.json();
 
+            // Stocker les infos utilisateur
+            localStorage.setItem("userData", JSON.stringify(userData));
+            localStorage.setItem("userId", userData.id);
             // Gestion "Se souvenir de moi"
             if (formData.rememberMe) {
                 localStorage.setItem("rememberedEmail", formData.email);
@@ -302,7 +319,7 @@ export function LoginForm() {
                 localStorage.removeItem("rememberedEmail");
             }
 
-            alert(`Bienvenue ${userData.pseudo || userData.prenom || 'utilisateur'} !`);
+            // alert(`Bienvenue ${userData.pseudo || userData.prenom || 'utilisateur'} !`);
             navigate("/");
 
         } catch (error) {
@@ -401,17 +418,32 @@ export function LoginForm() {
                         <label htmlFor="password" style={labelStyle}>
                             Mot de passe *
                         </label>
-                        <input
-                            type="password"
-                            id="password"
-                            name="password"
-                            placeholder="••••••••"
-                            value={formData.password}
-                            onChange={handleChange}
-                            style={errors.password ? inputErrorStyle : inputStyle}
-                            onFocus={(e) => e.target.style.borderColor = "#0085C7"}
-                            onBlur={(e) => e.target.style.borderColor = errors.password ? "#dc2626" : "#D9D9D9"}
-                        />
+                        <div style={passwordContainer}>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                id="password"
+                                name="password"
+                                placeholder="••••••••"
+                                value={formData.password}
+                                onChange={handleChange}
+                                style={errors.password ? inputErrorStyle : inputPassword}
+                                onFocus={(e) => e.target.style.borderColor = "#0085C7"}
+                                onBlur={(e) => e.target.style.borderColor = errors.password ? "#dc2626" : "#D9D9D9"}
+                            />
+                            <button
+                                type="button"
+                                style={eyeButton}
+                                onClick={() => setShowPassword(!showPassword)}
+                                title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                            >
+                                {showPassword ? (
+                                    <Eye size={20} color="#666" />
+                                ) : (
+                                    <EyeOff size={20} color="#666" />
+                                )}
+                            </button>
+                        </div>
+
                         {errors.password && <div style={errorMessageStyle}>{errors.password}</div>}
                     </div>
 
