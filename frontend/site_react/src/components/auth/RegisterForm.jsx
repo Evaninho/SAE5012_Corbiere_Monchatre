@@ -20,7 +20,7 @@ export function RegisterForm() {
         passwordConfirm: "",
         pays: "France",
         sports: [],
-        roles: ["ROLE_USER"],
+        // roles: [],
         acceptCGU: false
     });
 
@@ -28,7 +28,7 @@ export function RegisterForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
 
-    const paysList = ["France", "Belgique", "Suisse", "Canada", "Autre"];
+    const paysList = [ "Autre", "Afrique du Sud", "Algérie", "Allemagne", "Argentine", "Australie", "Autriche", "Belgique", "Brésil", "Canada", "Chine", "Corée du Sud", "Côte d'Ivoire", "Danemark", "Espagne", "États-Unis", "Finlande", "France", "Grèce", "Inde", "Irlande", "Italie", "Japon", "Luxembourg", "Maroc", "Mexique", "Norvège", "Nouvelle-Zélande", "Pays-Bas", "Portugal", "Royaume-Uni", "Russie", "Sénégal", "Suède", "Suisse", "Tunisie" ];
 
     const sportsList = [
         "Athlétisme", "Natation", "Gymnastique",
@@ -333,7 +333,7 @@ export function RegisterForm() {
                     password: formData.passwordConfirm,     // Sera hashé côté Symfony
                     pays: formData.pays,
                     sportFavoris: formData.sports[0] || "",
-                    roles: formData.roles
+                    // roles: ["ROLE_USER"]
                 })
             });
             console.log('status : ', response.status)

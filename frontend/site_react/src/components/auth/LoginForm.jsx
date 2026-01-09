@@ -282,6 +282,9 @@ export function LoginForm() {
                 }),
             });
 
+            console.log('status : ', response.status);
+            
+
             if (!response.ok) {
                 throw new Error("Email ou mot de passe incorrect");
             }
