@@ -10,6 +10,7 @@ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Delete};
 use Symfony\Component\Serializer\Annotation\Groups;
+use App\State\UserPasswordHasherProcessor;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
@@ -21,9 +22,10 @@ use Symfony\Component\Serializer\Annotation\Groups;
         new GetCollection(
             security: "is_granted('ROLE_ADMIN')"
         ),
-        new Post(),
+        new Post(processor: UserPasswordHasherProcessor::class),
         new Put(
-            security: "object == user or is_granted('ROLE_ADMIN')"
+            security: "object == user or is_granted('ROLE_ADMIN')",
+            processor: UserPasswordHasherProcessor::class
         ),
         new Delete(
             security: "is_granted('ROLE_ADMIN')"
@@ -74,7 +76,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     #[ORM\Column]
     #[Groups(['user:read'])]
-    private array $roles = [];
+    private array $roles = ['ROLE_USER'];
 
     /**
      * @var string The hashed password
@@ -82,6 +84,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     #[Groups(['user:write'])]
     private ?string $password = null;
+
+
+     #[Groups(['user:write'])]
+    private ?string $plainPassword = null;
 
     #[ORM\Column]
     #[Groups(['user:read'])]
@@ -234,6 +240,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function getPlainPassword(): ?string
+    {
+        return $this->plainPassword;
+    }
+
+    public function setPlainPassword(?string $plainPassword): self
+    {
+        $this->plainPassword = $plainPassword;
+        return $this;
+    }
     #[\Deprecated]
     public function eraseCredentials(): void
     {
