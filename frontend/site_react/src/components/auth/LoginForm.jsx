@@ -1,29 +1,11 @@
-<<<<<<< HEAD
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-=======
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
->>>>>>> develop
 import logoImage from "../image/LOGO_OFFI.png";
 
 export function LoginForm() {
     const navigate = useNavigate();
 
-<<<<<<< HEAD
-    const API_BASE_URL = "http://localhost:8000/api";
-
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState(null);
-    const [loading, setLoading] = useState(false);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError(null);
-        setLoading(true);
-=======
     const [formData, setFormData] = useState({
         email: "",
         password: "",
@@ -287,7 +269,6 @@ export function LoginForm() {
 
         setIsSubmitting(true);
         setErrors({});
->>>>>>> e03dd71e8427e86dc2c9ed067189fc00dec22f75
 
         try {
             const response = await fetch(`${API_BASE_URL}/login_check`, {
@@ -296,44 +277,21 @@ export function LoginForm() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-<<<<<<< HEAD
-                    email: email,
-                    password: password,
-=======
                     email: formData.email,
                     password: formData.password,
->>>>>>> e03dd71e8427e86dc2c9ed067189fc00dec22f75
                 }),
             });
 
+            console.log('status : ', response.status);
+            
+
             if (!response.ok) {
-<<<<<<< HEAD
-                if (response.status === 401) {
-                    throw new Error("Email ou mot de passe incorrect");
-                }
-                throw new Error("Erreur serveur");
-=======
                 throw new Error("Email ou mot de passe incorrect");
->>>>>>> e03dd71e8427e86dc2c9ed067189fc00dec22f75
             }
 
             const data = await response.json();
             // console.log("Réponse complète:", data);
 
-<<<<<<< HEAD
-            if (!data.token) {
-                throw new Error("Token JWT non reçu");
-            }
-
-            // ✅ Stockage du token
-            localStorage.setItem("authToken", data.token);
-
-            // ✅ Redirection
-            navigate("/");
-
-        } catch (err) {
-            setError(err.message);
-=======
             // Stocker le token
             localStorage.setItem("authToken", data.token);
 
@@ -370,14 +328,11 @@ export function LoginForm() {
         } catch (error) {
             console.error("Erreur login:", error);
             setErrors({ general: error.message });
->>>>>>> e03dd71e8427e86dc2c9ed067189fc00dec22f75
         } finally {
-            setLoading(false);
+            setIsSubmitting(false);
         }
     };
 
-<<<<<<< HEAD
-=======
     // Réinitialisation mot de passe
     const handlePasswordReset = async (e) => {
         e.preventDefault();
@@ -419,37 +374,48 @@ export function LoginForm() {
         }
     };
 
->>>>>>> e03dd71e8427e86dc2c9ed067189fc00dec22f75
     return (
-        <div style={styles.page}>
-            <div style={styles.container}>
-                <img src={logoImage} alt="OlymPeak" style={styles.logo} />
-                <h1 style={styles.title}>Connexion</h1>
+        <div style={pageStyle}>
+            <div style={containerStyle}>
+                <img src={logoImage} alt="OlymPeak" style={logoStyle} />
+                <h1 style={titleStyle}>Bienvenue !</h1>
+                <p style={subtitleStyle}>Connectez-vous pour accéder à votre compte</p>
 
-                {error && <div style={styles.error}>{error}</div>}
+                {errors.general && (
+                    <div style={{
+                        backgroundColor: '#fee2e2',
+                        border: '2px solid #dc2626',
+                        borderRadius: '10px',
+                        padding: '12px',
+                        marginBottom: '20px',
+                        textAlign: 'center',
+                        color: '#dc2626',
+                        fontWeight: '600'
+                    }}>
+                        {errors.general}
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit}>
-                    <input
-                        type="email"
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        style={styles.input}
-                        autoComplete="email"
-                    />
+                    {/* Email */}
+                    <div style={inputGroupStyle}>
+                        <label htmlFor="email" style={labelStyle}>
+                            Email *
+                        </label>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            placeholder="votre@email.com"
+                            value={formData.email}
+                            onChange={handleChange}
+                            style={errors.email ? inputErrorStyle : inputStyle}
+                            onFocus={(e) => e.target.style.borderColor = "#0085C7"}
+                            onBlur={(e) => e.target.style.borderColor = errors.email ? "#dc2626" : "#D9D9D9"}
+                        />
+                        {errors.email && <div style={errorMessageStyle}>{errors.email}</div>}
+                    </div>
 
-<<<<<<< HEAD
-                    <input
-                        type="password"
-                        placeholder="Mot de passe"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        style={styles.input}
-                        autoComplete="current-password"
-                    />
-=======
                     {/* Mot de passe */}
                     <div style={inputGroupStyle}>
                         <label htmlFor="password" style={labelStyle}>
@@ -483,12 +449,7 @@ export function LoginForm() {
 
                         {errors.password && <div style={errorMessageStyle}>{errors.password}</div>}
                     </div>
->>>>>>> develop
 
-<<<<<<< HEAD
-                    <button type="submit" disabled={loading} style={styles.button}>
-                        {loading ? "Connexion..." : "Se connecter"}
-=======
                     {/* Se souvenir + Mot de passe oublié */}
                     <div style={checkboxContainerStyle}>
                         <label style={checkboxLabelStyle}>
@@ -525,14 +486,14 @@ export function LoginForm() {
                         }}
                     >
                         {isSubmitting ? "Connexion en cours..." : "Se connecter"}
->>>>>>> e03dd71e8427e86dc2c9ed067189fc00dec22f75
                     </button>
                 </form>
 
-                <p style={styles.footer}>
-                    Pas de compte ?{" "}
-                    <Link to="/register" style={styles.link}>
-                        Inscription
+                {/* Footer */}
+                <p style={footerTextStyle}>
+                    Pas encore de compte ?{" "}
+                    <Link to="/register" style={linkStyle}>
+                        S'inscrire gratuitement
                     </Link>
                 </p>
             </div>
@@ -622,63 +583,3 @@ export function LoginForm() {
         </div>
     );
 }
-
-/* ================= STYLES ================= */
-
-const styles = {
-    page: {
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "#f3f4f6",
-    },
-    container: {
-        background: "white",
-        padding: "40px",
-        borderRadius: "16px",
-        width: "350px",
-        boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-        textAlign: "center",
-    },
-    logo: {
-        width: "100px",
-        marginBottom: "20px",
-    },
-    title: {
-        marginBottom: "20px",
-    },
-    input: {
-        width: "100%",
-        padding: "10px",
-        marginBottom: "15px",
-        borderRadius: "8px",
-        border: "1px solid #ccc",
-    },
-    button: {
-        width: "100%",
-        padding: "10px",
-        background: "#0085C7",
-        color: "white",
-        border: "none",
-        borderRadius: "8px",
-        cursor: "pointer",
-        fontWeight: "bold",
-    },
-    error: {
-        background: "#fee2e2",
-        color: "#b91c1c",
-        padding: "10px",
-        borderRadius: "8px",
-        marginBottom: "15px",
-    },
-    footer: {
-        marginTop: "15px",
-        fontSize: "14px",
-    },
-    link: {
-        color: "#0085C7",
-        fontWeight: "bold",
-        textDecoration: "none",
-    },
-};
