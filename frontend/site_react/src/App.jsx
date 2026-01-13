@@ -19,7 +19,12 @@ import { NewsPage3 } from './pages/NewsPage3.jsx'
 import { GameIntroPage } from './pages/GameIntroPage.jsx'
 import { ContactPage } from './pages/ContactPage.jsx'
 import { AccountPage } from './pages/AccountPage.jsx' 
-import { SettingsPage } from './pages/SettingsPage.jsx'
+// import { SettingsPage } from './pages/SettingsPage.jsx'
+
+import { ProfilePage} from './components/profile/profil.jsx'
+import { SubscriptionPage} from './components/profile/subprofil.jsx'
+import  SettingsPage from './components/profile/parametre.jsx'
+
 
 
 
@@ -43,6 +48,12 @@ function App() {
         <Route path="/register" element={<RegisterForm />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/jeux" element={<GameIntroPage />} />
+        {/* ----- compte ----- */}
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/abonnement" element={<SubscriptionPage />} />
+        <Route path="/parametres" element={<SettingsPage />} />
+
+        
       </Routes>
       <Footer />
     </>

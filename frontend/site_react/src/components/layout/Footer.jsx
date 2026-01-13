@@ -19,7 +19,7 @@ export function Footer() {
         },
         mainContent: {
             display: "grid",
-            gridTemplateColumns: window.innerWidth < 768 ? "1fr" : "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(4, 1fr)",
             gap: "40px",
             marginBottom: "40px"
         },
@@ -141,8 +141,31 @@ export function Footer() {
 
     return (
         <footer style={styles.footer}>
+            <style>{`
+                @media (max-width: 1024px) {
+                    .footer-grid {
+                        grid-template-columns: repeat(2, 1fr) !important;
+                    }
+                }
+                
+                @media (max-width: 768px) {
+                    .footer-grid {
+                        grid-template-columns: 1fr !important;
+                    }
+                    
+                    .footer-bottom {
+                        flex-direction: column !important;
+                        text-align: center !important;
+                    }
+                    
+                    .footer-bottom-links {
+                        justify-content: center !important;
+                    }
+                }
+            `}</style>
+            
             <div style={styles.container}>
-                <div style={styles.mainContent}>
+                <div className="footer-grid" style={styles.mainContent}>
                     <div style={styles.column}>
                         <h3 style={styles.columnTitle}>OlymPeak</h3>
                         <p style={styles.description}>
@@ -280,10 +303,10 @@ export function Footer() {
 
                 <div style={styles.divider}></div>
 
-                <div style={styles.bottom}>
+                <div className="footer-bottom" style={styles.bottom}>
                     <p>© {new Date().getFullYear()} OlymPeak - Tous droits réservés</p>
                     
-                    <div style={styles.bottomLinks}>
+                    <div className="footer-bottom-links" style={styles.bottomLinks}>
                         {legalLinks.map((link) => (
                             <Link
                                 key={link.to}
