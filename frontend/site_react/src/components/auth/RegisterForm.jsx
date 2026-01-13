@@ -1,12 +1,16 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 import logoImage from "../image/LOGO_OFFI.png";
 
 export function RegisterForm() {
     const navigate = useNavigate();
-    
+    const API_BASE_URL = "http://localhost:8000/api";
+
     const [currentStep, setCurrentStep] = useState(1);
-    
+    const [showPassword, setShowPassword] = useState(false);
+    const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+
     const [formData, setFormData] = useState({
         prenom: "",
         nom: "",
@@ -16,17 +20,17 @@ export function RegisterForm() {
         passwordConfirm: "",
         pays: "France",
         sports: [],
-        equipe: "",
-        newsletter: false,
         acceptCGU: false
     });
 
     const [errors, setErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
 
     const paysList = ["France", "Belgique", "Suisse", "Canada", "Autre"];
-    
+
     const sportsList = [
-        "Athlétisme", "Natation", "Gymnastique", 
+        "Athlétisme", "Natation", "Gymnastique",
         "Basketball", "Football", "Tennis"
     ];
 
@@ -72,6 +76,36 @@ export function RegisterForm() {
         border: "1px solid #D9D9D9",
         marginBottom: "15px",
         fontSize: "14px"
+    };
+
+    const passwordContainer = {
+        position: 'relative',
+        width: '100%'
+    };
+
+    const inputPassword = {
+        width: "100%",
+        height: "45px",
+        padding: '10px 45px 10px 15px',
+        fontSize: "14px",
+        border: "1px solid #D9D9D9",
+        borderRadius: "10px",
+        boxSizing: "border-box",
+        transition: "border-color 0.2s"
+    };
+
+    const eyeButton = {
+        position: 'absolute',
+        right: '15px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '5px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
     };
 
     const inputErrorStyle = {
@@ -194,15 +228,12 @@ export function RegisterForm() {
     };
 
     const handleSportChange = (sport) => {
-        const newSports = formData.sports.includes(sport)
-            ? formData.sports.filter(s => s !== sport)
-            : [...formData.sports, sport];
-        
-        if (newSports.length <= 3) {
-            setFormData({ ...formData, sports: newSports });
-            if (errors.sports) {
-                setErrors({ ...errors, sports: "" });
-            }
+        const isSelected = formData.sports.includes(sport);
+        const newSports = isSelected ? [] : [sport];
+
+        setFormData({ ...formData, sports: newSports });
+        if (errors.sports) {
+            setErrors({ ...errors, sports: "" });
         }
     };
 
@@ -260,17 +291,6 @@ export function RegisterForm() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const validateStep3 = () => {
-        const newErrors = {};
-
-        if (!formData.acceptCGU) {
-            newErrors.acceptCGU = "Vous devez accepter les CGU";
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
     const handleNext = () => {
         if (currentStep === 1 && validateStep1()) {
             setCurrentStep(2);
@@ -285,18 +305,101 @@ export function RegisterForm() {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!validateStep3()) {
+        if (!formData.acceptCGU) {
+            setErrors({ acceptCGU: "Vous devez accepter les CGU" });
             return;
         }
 
-        console.log("Données du formulaire:", formData);
+        setIsSubmitting(true);
 
-        alert("Inscription réussie ! Bienvenue " + formData.prenom + " !");
-        
-        navigate("/login");
+        try {
+            // ========== ENVOI À SYMFONY ==========
+            const response = await fetch(`${API_BASE_URL}/users`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/ld+json',
+                    'Accept': 'application/ld+json'
+                },
+                body: JSON.stringify({
+                    // Données envoyées à Symfony
+                    prenom: formData.prenom,      // Symfony attend firstName
+                    nom: formData.nom,          // Symfony attend lastName
+                    email: formData.email,
+                    pseudo: formData.username,
+                    plainPassword: formData.password,     // Sera hashé côté Symfony
+                    pays: formData.pays,
+                    sportFavoris: formData.sports[0] || "",
+                })
+            });
+            console.log('status : ', response.status)
+
+            // if (!response.ok) {
+            //     const errorData = await response.json();
+            //     if (response.status === 400) {
+            //         // Erreur de validation
+            //         throw new Error(errorData.message || 'Données invalides');
+            //     } else if (response.status === 409) {
+            //         // Email ou username déjà utilisé
+            //         throw new Error('Cet email ou nom d\'utilisateur existe déjà');
+            //     }
+            //     throw new Error('Erreur lors de l\'inscription');
+            // }
+            if (!response.ok) {
+                const error = await response.json();
+                console.error("Erreur API:", error);
+                throw new Error(error['hydra:description'] || 'Erreur 400');
+            }
+
+            // const data = await response.json();
+
+            // console.log('Inscription réussie:', data);
+
+            // 2️⃣ Login automatique
+            const loginResponse = await fetch(`${API_BASE_URL}/login_check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: formData.email,
+                    password: formData.password
+                })
+            });
+
+            if (!loginResponse.ok) {
+                throw new Error('Connexion automatique impossible');
+            }
+
+            const loginData = await loginResponse.json();
+            localStorage.setItem('authToken', loginData.token);
+
+            // 3️⃣ Récupération user connecté
+            const meResponse = await fetch(`${API_BASE_URL}/me`, {
+                headers: {
+                    Authorization: `Bearer ${loginData.token}`
+                }
+            });
+
+            const userData = await meResponse.json();
+            localStorage.setItem('userData', JSON.stringify(userData));
+            localStorage.setItem('userId', userData.id);
+
+            // Connexion automatique après inscription
+            // if (data.token) {
+            //     localStorage.setItem('authToken', data.token);
+            //     localStorage.setItem('userData', JSON.stringify(data.user));
+            // }
+
+            alert('Inscription réussie ! Bienvenue ' + formData.prenom + ' !');
+            navigate('/');
+
+        } catch (error) {
+            console.error('Erreur inscription:', error);
+            alert(error.message || 'Une erreur est survenue');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -317,7 +420,7 @@ export function RegisterForm() {
                 {currentStep === 1 && (
                     <>
                         <h2>Informations de base</h2>
-                        
+
                         <div>
                             <label htmlFor="prenom">Prénom* :</label>
                             <input
@@ -376,32 +479,62 @@ export function RegisterForm() {
 
                         <div>
                             <label htmlFor="password">Mot de passe* :</label>
-                            <input
-                                type="password"
-                                id="password"
-                                name="password"
-                                placeholder="Minimum 8 caractères"
-                                value={formData.password}
-                                onChange={handleChange}
-                                style={errors.password ? inputErrorStyle : inputStyle}
-                            />
+                            <div style={passwordContainer}>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    id="password"
+                                    name="password"
+                                    placeholder="Minimum 8 caractères"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    style={errors.password ? inputErrorStyle : inputPassword}
+                                />
+                                <button
+                                    type="button"
+                                    style={eyeButton}
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                                >
+                                    {showPassword ? (
+                                        <Eye size={20} color="#666" />
+                                    ) : (
+                                        <EyeOff size={20} color="#666" />
+                                    )}
+                                </button>
+                            </div>
+
                             {errors.password && <div style={errorMessageStyle}>{errors.password}</div>}
-                            <div style={{ fontSize: "11px", color: "#666", marginTop: "-8px", marginBottom: "10px" }}>
+                            <div style={{ fontSize: "11px", color: "#666", marginTop: "3px", marginBottom: "10px" }}>
                                 Minimum 8 caractères, 1 majuscule, 1 chiffre
                             </div>
                         </div>
 
                         <div>
                             <label htmlFor="passwordConfirm">Confirmez le mot de passe* :</label>
-                            <input
-                                type="password"
-                                id="passwordConfirm"
-                                name="passwordConfirm"
-                                placeholder="Confirmez votre mot de passe"
-                                value={formData.passwordConfirm}
-                                onChange={handleChange}
-                                style={errors.passwordConfirm ? inputErrorStyle : inputStyle}
-                            />
+                            <div style={passwordContainer}>
+                                <input
+                                    type={showPasswordConfirm ? "text" : "password"}
+                                    id="passwordConfirm"
+                                    name="passwordConfirm"
+                                    placeholder="Confirmez votre mot de passe"
+                                    value={formData.passwordConfirm}
+                                    onChange={handleChange}
+                                    style={errors.passwordConfirm ? inputErrorStyle : inputPassword}
+                                />
+                                <button
+                                    type="button"
+                                    style={eyeButton}
+                                    onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                                    title={showPasswordConfirm ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                                >
+                                    {showPasswordConfirm ? (
+                                        <Eye size={20} color="#666" />
+                                    ) : (
+                                        <EyeOff size={20} color="#666" />
+                                    )}
+                                </button>
+                            </div>
+
                             {errors.passwordConfirm && <div style={errorMessageStyle}>{errors.passwordConfirm}</div>}
                         </div>
 
@@ -431,7 +564,7 @@ export function RegisterForm() {
                         </div>
 
                         <div>
-                            <label>Sports favoris (3 maximum) * :</label>
+                            <label>Votre Sport favori * :</label>
                             <div style={{ marginTop: "10px" }}>
                                 {sportsList.map(sport => (
                                     <label key={sport} style={checkboxLabelStyle}>
@@ -448,19 +581,6 @@ export function RegisterForm() {
                             {errors.sports && <div style={errorMessageStyle}>{errors.sports}</div>}
                         </div>
 
-                        {/* <div>
-                            <label htmlFor="equipe">Équipe olympique préférée :</label>
-                            <input
-                                type="text"
-                                id="equipe"
-                                name="equipe"
-                                placeholder="France, États-Unis..."
-                                value={formData.equipe}
-                                onChange={handleChange}
-                                style={inputStyle}
-                            />
-                        </div> */}
-
                         <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
                             <button type="button" onClick={handleBack} style={buttonStyleBack}>
                                 Retour
@@ -476,9 +596,9 @@ export function RegisterForm() {
                     <>
                         <h2>Finalisation</h2>
 
-                        <div style={{ 
-                            backgroundColor: "#e0f2fe", 
-                            padding: "15px", 
+                        <div style={{
+                            backgroundColor: "#e0f2fe",
+                            padding: "15px",
                             borderRadius: "10px",
                             border: "1px solid #0085C7",
                             marginBottom: "20px"
@@ -505,13 +625,13 @@ export function RegisterForm() {
                                 style={checkboxStyle}
                             />
                             <span>
-                                J'accepte les <Link to="/cgu" style={linkStyle}>conditions d'utilisation</Link> et 
+                                J'accepte les <Link to="/cgu" style={linkStyle}>conditions d'utilisation</Link> et
                                 la <Link to="/confidentialite" style={linkStyle}>politique de confidentialité</Link> *
                             </span>
                         </label>
                         {errors.acceptCGU && <div style={errorMessageStyle}>{errors.acceptCGU}</div>}
 
-                        <label style={checkboxLabelStyle}>
+                        {/* <label style={checkboxLabelStyle}>
                             <input
                                 type="checkbox"
                                 name="newsletter"
@@ -520,14 +640,14 @@ export function RegisterForm() {
                                 style={checkboxStyle}
                             />
                             Je souhaite recevoir les actualités et offres exclusives par email
-                        </label>
+                        </label>*/}
 
                         <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
                             <button type="button" onClick={handleBack} style={buttonStyleBack}>
                                 Retour
                             </button>
-                            <button type="submit" style={buttonStyleSend}>
-                                Créer mon compte
+                            <button type="submit" disabled={isSubmitting} style={buttonStyleSend}>
+                                {isSubmitting ? 'Création...' : 'Créer mon compte'}
                             </button>
                         </div>
                     </>

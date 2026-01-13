@@ -15,8 +15,7 @@ export function ProfilePage() {
     pseudo: '',
     email: '',
     pays: '',
-    sport_favoris: '',
-    bio: ''
+    sports: ''
   });
 
   const API_BASE_URL = 'http://localhost:8000/api';
@@ -154,8 +153,7 @@ export function ProfilePage() {
           pseudo: data.pseudo || '',
           email: data.email || '',
           pays: data.pays || '',
-          sport_favoris: data.sport_favoris || '',
-          bio: data.bio || ''
+          sportFavoris: data.sports || ''
         });
       }
     } catch (error) {
@@ -174,12 +172,16 @@ export function ProfilePage() {
 
   const handleSave = async () => {
     const token = localStorage.getItem('authToken');
+    const userID = localStorage.getItem('userId');
+    
     setIsSaving(true);
     console.log('lancement');
+    console.log(userID);
+    
     
 
     try {
-      const response = await fetch(`${API_BASE_URL}/user/profile`, {
+      const response = await fetch(`${API_BASE_URL}/user/${userID}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -187,6 +189,8 @@ export function ProfilePage() {
         },
         body: JSON.stringify(formData)
       });
+      console.log("statu : "+response.status);
+      
 
       if (!response.ok) {
         throw new Error('Erreur lors de la mise à jour');

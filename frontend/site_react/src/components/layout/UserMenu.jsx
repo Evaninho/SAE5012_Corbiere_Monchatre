@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { User, Crown, Settings, LogOut } from "lucide-react";
 
 const UserMenu = ({ onLogout }) => {
@@ -144,14 +144,18 @@ const UserMenu = ({ onLogout }) => {
     return userData.email.split("@")[0];
   };
 
+  const navigate = useNavigate();
+
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("userData");
+    localStorage.removeItem("userId");
 
     if (onLogout) onLogout();
 
     window.dispatchEvent(new Event("user-login"));
     setIsOpen(false);
+    navigate("/");
   };
 
   /* ================= RENDER ================= */
