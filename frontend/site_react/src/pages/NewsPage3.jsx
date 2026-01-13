@@ -1,12 +1,15 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "../components/news/search";
-import { MessageSquare, Eye, Heart, Star, Send, Edit2, Trash2 } from "lucide-react";
+import { MessageSquare, Eye, Heart, Star, Send } from "lucide-react";
+
+// ========== CONSTANTE API ==========
+const API_BASE_URL = 'http://localhost:8000/api';
 
 export function NewsPage3() {
-  const [expandedArticle, setExpandedArticle] = useState(null);
-  const [comments, setComments] = useState({});
-  const [newComment, setNewComment] = useState("");
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
   const [favorites, setFavorites] = useState({});
   const [ratings, setRatings] = useState({});
   const [hoveredStar, setHoveredStar] = useState({});
@@ -20,9 +23,9 @@ export function NewsPage3() {
   const isLoggedIn = !!getToken();
   const currentUserId = getUserId();
 
-  // FETCH ARTICLES (VOTRE CODE - NE CHANGE PAS)
+  // FETCH ARTICLES
   const fetchArticles = async () => {
-    const response = await fetch("http://localhost:8000/api/articles");
+    const response = await fetch(`${API_BASE_URL}/articles`);
 
     if (!response.ok) {
       throw new Error("Erreur API");
@@ -37,55 +40,17 @@ export function NewsPage3() {
     queryFn: fetchArticles,
   });
 
-  // FETCH COMMENTAIRES d'un article
-  const fetchComments = async (articleId) => {
-    if (comments[articleId]) return; // Déjà chargés
-
-    try {
-      const response = await fetch(`http://localhost:8000/api/rantings/${articleId}/comments`);
-      const data = await response.json();
-      setComments(prev => ({ ...prev, [articleId]: data.data || [] }));
-      console.log(data);
-    } catch (error) {
-      console.error('Erreur commentaires:', error);
-    }
-  };
-
-  // AJOUTER UN COMMENTAIRE
-  const handleAddComment = async (articleId) => {
-    if (!newComment.trim()) return;
-
-    try {
-      const response = await fetch(`http://localhost:8000/api/articles/${articleId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getToken()}`
-        },
-        body: JSON.stringify({ content: newComment })
-      });
-
-      const data = await response.json();
-      setComments(prev => ({
-        ...prev,
-        [articleId]: [data.data, ...(prev[articleId] || [])]
-      }));
-      setNewComment("");
-    } catch (error) {
-      console.error('Erreur ajout commentaire:', error);
-      alert(error.message);
-    }
-  };
-
   // TOGGLE FAVORI
-  const handleToggleFavorite = async (articleId) => {
+  const handleToggleFavorite = async (articleId, e) => {
+    e.stopPropagation(); // Empêcher la navigation
+
     if (!isLoggedIn) {
       alert('Vous devez être connecté');
       return;
     }
 
     try {
-      await fetch(`http://localhost:8000/api/articles/${articleId}/favorite`, {
+      await fetch(`${API_BASE_URL}/articles/${articleId}/favorite`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${getToken()}`
@@ -102,14 +67,16 @@ export function NewsPage3() {
   };
 
   // NOTER UN ARTICLE
-  const handleRate = async (articleId, rating) => {
+  const handleRate = async (articleId, rating, e) => {
+    e.stopPropagation(); // Empêcher la navigation
+
     if (!isLoggedIn) {
       alert('Vous devez être connecté pour noter');
       return;
     }
 
     try {
-      await fetch(`http://localhost:8000/api/ratings/${articleId}/stars`, {
+      await fetch(`${API_BASE_URL}/ratings/${articleId}/stars`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,7 +84,7 @@ export function NewsPage3() {
         },
         body: JSON.stringify({ rating })
       });
-      console.log(rating);
+
       setRatings(prev => ({
         ...prev,
         [articleId]: rating
@@ -127,315 +94,276 @@ export function NewsPage3() {
     }
   };
 
-  // TOGGLE EXPANSION (pour voir les commentaires)
-  const toggleExpand = (articleId) => {
-    if (expandedArticle === articleId) {
-      setExpandedArticle(null);
-    } else {
-      setExpandedArticle(articleId);
-      fetchComments(articleId);
+  // NAVIGATION VERS LE DÉTAIL (récupère l'article puis navigue en passant les données)
+  const handleArticleClick = async (articleId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/articles/${articleId}`);
+      if (!response.ok) {
+        throw new Error('Erreur API');
+      }
+      const data = await response.json();
+      const articleData = data.member || data;
+      navigate(`/articles/${articleId}`, { state: { article: articleData } });
+    } catch (error) {
+      console.error('Erreur récupération article:', error);
+      navigate(`/articles/${articleId}`);
     }
   };
 
-  if (isLoading) return <p style={{ textAlign: 'center', padding: '40px' }}>Chargement...</p>;
+  // FILTRER LES ARTICLES PAR RECHERCHE
+  const filteredArticles = articles?.filter(article =>
+    article.title.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  if (isLoading) return <p style={{ textAlign: 'center', padding: '40px', minHeight:'100vh', lineHeight:'25vh', fontSize: '20px', color: "rgb(102, 102, 102)" }}>Chargement...</p>;
   if (error) return <p style={{ textAlign: 'center', padding: '40px', color: '#dc2626' }}>Erreur de chargement</p>;
 
   return (
-    <main style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 20px" }}>
-      <h1 style={{ fontSize: '36px', fontWeight: 'bold', color: '#0085C7', marginBottom: '10px' }}>
-        📰 Actualités
-      </h1>
-      <Search />
+    <main style={{ 
+      maxWidth: "1200px", 
+      margin: "0 auto", 
+      padding: "40px 20px",
+      fontFamily: 'Arial, sans-serif'
+    }}>
+      {/* HEADER */}
+      <div style={{ marginBottom: '30px' }}>
+        <h1 style={{ 
+          fontSize: '36px', 
+          fontWeight: 'bold', 
+          color: '#0085C7', 
+          marginBottom: '10px' 
+        }}>
+          📰 Actualités
+        </h1>
+        <p style={{ color: '#666', fontSize: '16px' }}>
+          Découvrez les dernières actualités olympiques
+        </p>
+      </div>
 
-      {articles.map((article) => {
-        const sortedBlocks = [...article.blocks].sort(
-          (a, b) => a.orderIndex - b.orderIndex
-        );
+      {/* BARRE DE RECHERCHE */}
+      <Search value={searchTerm} onChange={setSearchTerm} />
 
-        const isFavorite = favorites[article.id] || false;
-        const userRating = ratings[article.id] || 0;
-        const isExpanded = expandedArticle === article.id;
-        const articleComments = comments[article.id] || [];
+      {/* MESSAGE SI AUCUN RÉSULTAT */}
+      {filteredArticles.length === 0 && (
+        <div style={{
+          textAlign: 'center',
+          padding: '60px 20px',
+          backgroundColor: 'white',
+          borderRadius: '15px',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+        }}>
+          <p style={{ fontSize: '18px', color: '#666' }}>
+            Aucun article trouvé pour "{searchTerm}"
+          </p>
+        </div>
+      )}
 
-        return (
-          <article
-            key={article.id}
-            style={{
-              marginBottom: "60px",
-              padding: "30px",
-              borderRadius: "20px",
-              background: "#fff",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-            }}
-          >
-            {/* HEADER AVEC TITRE + FAVORI */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-              <h2 style={{ color: "#0085C7", flex: 1 }}>{article.title}</h2>
-              
-              {/* Bouton Favori */}
-              <button
-                onClick={() => handleToggleFavorite(article.id)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '8px'
-                }}
-              >
-                <Heart
-                  size={24}
-                  color={isFavorite ? '#dc2626' : '#666'}
-                  fill={isFavorite ? '#dc2626' : 'transparent'}
-                />
-              </button>
-            </div>
+      {/* GRILLE D'ARTICLES */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+        gap: '25px'
+      }}>
+        {filteredArticles.map((article) => {
+          const sortedBlocks = [...article.blocks].sort(
+            (a, b) => a.orderIndex - b.orderIndex
+          );
 
-            {/* BLOCKS (VOTRE CODE - NE CHANGE PAS) */}
-            {sortedBlocks.map((block) => {
-              /* 📝 TEXTE */
-              if (block.type === "text") {
-                return (
-                  <p
-                    key={block.id}
-                    style={{
-                      marginBottom: "20px",
-                      lineHeight: 1.7,
-                      fontSize: "16px",
-                    }}
-                  >
-                    {block.content?.text}
-                  </p>
-                );
-              }
+          // Trouver la première image
+          const firstImage = sortedBlocks.find(block => block.type === 'image');
+          
+          // Extraire le premier texte (extrait)
+          const firstText = sortedBlocks.find(block => block.type === 'text');
+          const excerpt = firstText?.content?.text?.substring(0, 150) + '...' || '';
 
-              /* 🖼 IMAGE */
-              if (block.type === "image") {
-                return (
+          const isFavorite = favorites[article.id] || false;
+          const userRating = ratings[article.id] || 0;
+
+          return (
+            <article
+              key={article.id}
+              onClick={() => handleArticleClick(article.id)}
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '15px',
+                overflow: 'hidden',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+              }}
+            >
+              {/* IMAGE */}
+              <div style={{
+                width: '100%',
+                height: '200px',
+                backgroundColor: '#e5e7eb',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                {firstImage ? (
                   <img
-                    key={block.id}
-                    src={block.content?.url}
-                    alt=""
+                    src={firstImage.content?.url}
+                    alt={article.title}
                     style={{
-                      width: "100%",
-                      borderRadius: "14px",
-                      marginBottom: "25px",
-                      objectFit: "cover",
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
                     }}
                   />
-                );
-              }
-
-              /* 📊 VISUALIZATION */
-              if (block.type === "visualization") {
-                return (
-                  <div
-                    key={block.id}
-                    style={{
-                      height: "220px",
-                      background: "#f0f4f8",
-                      borderRadius: "14px",
-                      marginBottom: "25px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#666",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    📊 Visualisation (à venir)
-                  </div>
-                );
-              }
-
-              return null;
-            })}
-
-            {/* FOOTER : NOTATION + STATS + COMMENTAIRES */}
-            <div style={{
-              borderTop: '1px solid #e5e7eb',
-              paddingTop: '20px',
-              marginTop: '20px'
-            }}>
-              {/* Notation par étoiles */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '15px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: '#333' }}>Votre note :</span>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      onClick={() => handleRate(article.id, star)}
-                      onMouseEnter={() => setHoveredStar({ ...hoveredStar, [article.id]: star })}
-                      onMouseLeave={() => setHoveredStar({ ...hoveredStar, [article.id]: 0 })}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 0
-                      }}
-                    >
-                      <Star
-                        size={20}
-                        color="#FFD700"
-                        fill={star <= (hoveredStar[article.id] || userRating) ? '#FFD700' : 'transparent'}
-                      />
-                    </button>
-                  ))}
-                </div>
-                {userRating > 0 && (
-                  <span style={{ fontSize: '13px', color: '#0085C7', fontWeight: '600' }}>
-                    {userRating}/5
-                  </span>
-                )}
-              </div>
-
-              {/* Bouton Voir les commentaires */}
-              <button
-                onClick={() => toggleExpand(article.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  backgroundColor: '#f3f4f6',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#333'
-                }}
-              >
-                <MessageSquare size={18} />
-                {isExpanded ? 'Masquer les commentaires' : 'Voir les commentaires'}
-              </button>
-            </div>
-
-            {/* SECTION COMMENTAIRES (si expanded) */}
-            {isExpanded && (
-              <div style={{
-                marginTop: '25px',
-                paddingTop: '25px',
-                borderTop: '1px solid #e5e7eb'
-              }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>
-                  Commentaires ({articleComments.length})
-                </h3>
-
-                {/* Formulaire d'ajout */}
-                {isLoggedIn ? (
-                  <div style={{ marginBottom: '20px' }}>
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Ajouter un commentaire..."
-                      style={{
-                        width: '100%',
-                        minHeight: '80px',
-                        padding: '12px',
-                        border: '1px solid #D9D9D9',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        fontFamily: 'Arial, sans-serif',
-                        resize: 'vertical',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                    <button
-                      onClick={() => handleAddComment(article.id)}
-                      style={{
-                        marginTop: '10px',
-                        padding: '8px 16px',
-                        backgroundColor: '#0085C7',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}
-                    >
-                      <Send size={16} />
-                      Publier
-                    </button>
-                  </div>
                 ) : (
                   <div style={{
-                    backgroundColor: '#f0f9ff',
-                    border: '2px solid #0085C7',
-                    borderRadius: '8px',
-                    padding: '15px',
-                    textAlign: 'center',
-                    color: '#0085C7',
-                    fontWeight: '600',
-                    marginBottom: '20px'
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '48px'
                   }}>
-                    Vous devez être connecté pour commenter
+                    📰
                   </div>
                 )}
 
-                {/* Liste des commentaires */}
-                {articleComments.length === 0 ? (
-                  <p style={{ textAlign: 'center', color: '#666', padding: '20px' }}>
-                    Aucun commentaire. Soyez le premier !
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    {articleComments.map((comment) => (
-                      <div
-                        key={comment.id}
-                        style={{
-                          backgroundColor: '#f9f9f9',
-                          padding: '15px',
-                          borderRadius: '8px'
-                        }}
-                      >
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          marginBottom: '10px'
-                        }}>
-                          {/* Avatar */}
-                          <div style={{
-                            width: '35px',
-                            height: '35px',
-                            borderRadius: '50%',
-                            backgroundColor: '#0085C7',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontWeight: 'bold',
-                            fontSize: '14px'
-                          }}>
-                            {comment.user?.name?.charAt(0).toUpperCase() || 'U'}
-                          </div>
-                          
-                          <div>
-                            <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                              {comment.user?.name || 'Utilisateur'}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#999' }}>
-                              {new Date(comment.created_at).toLocaleDateString('fr-FR')}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <p style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
-                          {comment.content}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* BOUTON FAVORI */}
+                <button
+                  onClick={(e) => handleToggleFavorite(article.id, e)}
+                  style={{
+                    position: 'absolute',
+                    top: '15px',
+                    right: '15px',
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    backgroundColor: 'white',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  <Heart
+                    size={20}
+                    color={isFavorite ? '#dc2626' : '#666'}
+                    fill={isFavorite ? '#dc2626' : 'transparent'}
+                  />
+                </button>
               </div>
-            )}
-          </article>
-        );
-      })}
+
+              {/* CONTENU */}
+              <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {/* TITRE */}
+                <h2 style={{ 
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  color: '#333',
+                  marginBottom: '10px',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden'
+                }}>
+                  {article.title}
+                </h2>
+
+                {/* EXTRAIT */}
+                <p style={{
+                  fontSize: '14px',
+                  color: '#666',
+                  lineHeight: '1.6',
+                  marginBottom: '15px',
+                  flex: 1
+                }}>
+                  {excerpt}
+                </p>
+
+                {/* FOOTER */}
+                <div style={{
+                  borderTop: '1px solid #e5e7eb',
+                  paddingTop: '15px'
+                }}>
+                  {/* NOTATION */}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    marginBottom: '10px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '3px' }}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={(e) => handleRate(article.id, star, e)}
+                          onMouseEnter={(e) => {
+                            e.stopPropagation();
+                            setHoveredStar({ ...hoveredStar, [article.id]: star });
+                          }}
+                          onMouseLeave={(e) => {
+                            e.stopPropagation();
+                            setHoveredStar({ ...hoveredStar, [article.id]: 0 });
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0
+                          }}
+                        >
+                          <Star
+                            size={16}
+                            color="#FFD700"
+                            fill={star <= (hoveredStar[article.id] || userRating) ? '#FFD700' : 'transparent'}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    {userRating > 0 && (
+                      <span style={{ fontSize: '12px', color: '#0085C7', fontWeight: '600' }}>
+                        {userRating}/5
+                      </span>
+                    )}
+                  </div>
+
+                  {/* STATS */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px',
+                    fontSize: '13px',
+                    color: '#666'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <MessageSquare size={16} />
+                      <span>{article.comments?.length || 0}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Eye size={16} />
+                      <span>{article.views || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </main>
   );
 }

@@ -20,6 +20,7 @@ export function RegisterForm() {
         passwordConfirm: "",
         pays: "France",
         sports: [],
+        // roles: [],
         acceptCGU: false
     });
 
@@ -27,7 +28,7 @@ export function RegisterForm() {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
 
-    const paysList = ["France", "Belgique", "Suisse", "Canada", "Autre"];
+    const paysList = [ "Autre", "Afrique du Sud", "Algérie", "Allemagne", "Argentine", "Australie", "Autriche", "Belgique", "Brésil", "Canada", "Chine", "Corée du Sud", "Côte d'Ivoire", "Danemark", "Espagne", "États-Unis", "Finlande", "France", "Grèce", "Inde", "Irlande", "Italie", "Japon", "Luxembourg", "Maroc", "Mexique", "Norvège", "Nouvelle-Zélande", "Pays-Bas", "Portugal", "Royaume-Uni", "Russie", "Sénégal", "Suède", "Suisse", "Tunisie" ];
 
     const sportsList = [
         "Athlétisme", "Natation", "Gymnastique",
@@ -329,29 +330,30 @@ export function RegisterForm() {
                     nom: formData.nom,          // Symfony attend lastName
                     email: formData.email,
                     pseudo: formData.username,
-                    plainPassword: formData.password,     // Sera hashé côté Symfony
+                    password: formData.passwordConfirm,     // Sera hashé côté Symfony
                     pays: formData.pays,
                     sportFavoris: formData.sports[0] || "",
+                    // roles: ["ROLE_USER"]
                 })
             });
             console.log('status : ', response.status)
 
-            // if (!response.ok) {
-            //     const errorData = await response.json();
-            //     if (response.status === 400) {
-            //         // Erreur de validation
-            //         throw new Error(errorData.message || 'Données invalides');
-            //     } else if (response.status === 409) {
-            //         // Email ou username déjà utilisé
-            //         throw new Error('Cet email ou nom d\'utilisateur existe déjà');
-            //     }
-            //     throw new Error('Erreur lors de l\'inscription');
-            // }
             if (!response.ok) {
-                const error = await response.json();
-                console.error("Erreur API:", error);
-                throw new Error(error['hydra:description'] || 'Erreur 400');
+                const errorData = await response.json();
+                if (response.status === 400) {
+                    // Erreur de validation
+                    throw new Error(errorData.message || 'Données invalides');
+                } else if (response.status === 409) {
+                    // Email ou username déjà utilisé
+                    throw new Error('Cet email ou nom d\'utilisateur existe déjà');
+                }
+                throw new Error('Erreur lors de l\'inscription');
             }
+            // if (!response.ok) {
+            //     const error = await response.json();
+            //     console.error("Erreur API:", error);
+            //     throw new Error(error['hydra:description'] || 'Erreur 400');
+            // }
 
             // const data = await response.json();
 
