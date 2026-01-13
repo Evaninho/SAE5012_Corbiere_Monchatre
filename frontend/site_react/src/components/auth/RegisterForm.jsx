@@ -330,13 +330,13 @@ export function RegisterForm() {
                     nom: formData.nom,          // Symfony attend lastName
                     email: formData.email,
                     pseudo: formData.username,
-                    password: formData.passwordConfirm,     // Sera hashé côté Symfony
+                    plainPassword: formData.password,     // Sera hashé côté Symfony
                     pays: formData.pays,
                     sportFavoris: formData.sports[0] || "",
                     // roles: ["ROLE_USER"]
                 })
             });
-            console.log('status : ', response.status)
+            // console.log('status : ', response.status)
 
             if (!response.ok) {
                 const errorData = await response.json();
