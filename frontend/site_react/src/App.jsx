@@ -15,6 +15,7 @@ import { StatsPage } from './pages/StatsPage.jsx'
 import { NewsPage } from './pages/NewsPage.jsx'
 import { NewsPage2 } from './pages/NewsPage2.jsx'
 import { NewsPage3 } from './pages/NewsPage3.jsx'
+import { NewsDetailPage } from './pages/NewsDetailPage.jsx'
 
 import { GameIntroPage } from './pages/GameIntroPage.jsx'
 import { ContactPage } from './pages/ContactPage.jsx'
@@ -53,7 +54,9 @@ function App() {
         <Route path="/abonnement" element={<SubscriptionPage />} />
         <Route path="/parametres" element={<SettingsPage />} />
 
-        
+        {/* ----- article ----- */}
+        <Route path="/articles/:id" element={<NewsDetailPage />} />
+
       </Routes>
       <Footer />
     </>
