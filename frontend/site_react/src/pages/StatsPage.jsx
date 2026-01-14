@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, TrendingUp, Medal, Trophy, BarChart3 } from 'lucide-react';
+import { Search, Filter, TrendingUp, Medal, Trophy, BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function StatsPage() {
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [csvData, setCsvData] = useState([]);
+  const [currentDatasetIndex, setCurrentDatasetIndex] = useState(0);
+  const [datasets, setDatasets] = useState([]);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [sortBy, setSortBy] = useState('name');
 
   // Filtres
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEdition, setSelectedEdition] = useState('all');
   const [selectedSport, setSelectedSport] = useState('all');
-  const [sortBy, setSortBy] = useState('total');
 
   const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -236,16 +240,14 @@ export function StatsPage() {
   // Charger les statistiques
   useEffect(() => {
     loadStats();
-  }, [selectedEdition, selectedSport, sortBy]);
-  fetch('http://localhost:8000/api/datasets?page=1')
-    .then(response => {
-      console.log(response); // infos HTTP
-      return response.json(); // lire les données
-    })
-    .then(data => {
-      console.log(data); // 👈 LES DONNÉES
-    })
-    .catch(error => console.error(error));
+  }, [selectedEdition, selectedSport]);
+
+  // Charger les données CSV quand le dataset change
+  useEffect(() => {
+    if (datasets.length > 0) {
+      loadCsvData(datasets[currentDatasetIndex].path);
+    }
+  }, [currentDatasetIndex, datasets]);
   const loadStats = async () => {
     try {
       setLoading(true);
@@ -254,17 +256,27 @@ export function StatsPage() {
       const params = new URLSearchParams();
       if (selectedEdition !== 'all') params.append('edition', selectedEdition);
       if (selectedSport !== 'all') params.append('sport', selectedSport);
-      params.append('sort', sortBy);
 
       const response = await fetch(`${API_BASE_URL}/datasets?${params.toString()}`);
-      // console.log('Response status:', response.status);
+      console.log('Response status:', response.status);
 
       if (!response.ok) {
         throw new Error('Erreur lors du chargement des statistiques');
       }
 
       const data = await response.json();
-      setStats(data.data || []);
+      console.log('Datasets reçus:', data);
+      
+      // Extraire les datasets avec le path
+      const datasetsWithPath = data.member.map(dataset => ({
+        ...dataset,
+        path: dataset.path
+      }));
+      
+      console.log('Datasets avec path:', datasetsWithPath);
+      setDatasets(datasetsWithPath);
+      setStats(datasetsWithPath);
+      setCurrentDatasetIndex(0);
 
     } catch (err) {
       console.error('Erreur:', err);
@@ -274,9 +286,83 @@ export function StatsPage() {
     }
   };
 
+  // Charger et parser les données CSV
+  const loadCsvData = async (csvPath) => {
+    try {
+      setCsvLoading(true);
+      console.log('Tentative de chargement du CSV:', csvPath);
+      
+      // Essayer d'abord depuis le backend
+      let response = await fetch(`http://localhost:8000/${csvPath}`, {
+        mode: 'cors'
+      }).catch(() => null);
+      
+      // Si ça échoue, essayer depuis le dossier public du frontend
+      if (!response || !response.ok) {
+        console.log('Chargement depuis le backend échoué, essai depuis le frontend...');
+        // Extraire le nom du fichier
+        const fileName = csvPath.split('/').pop();
+        response = await fetch(`/datasets/${fileName}`);
+      }
+      
+      if (!response || !response.ok) {
+        console.error('Response status:', response?.status, 'Response OK:', response?.ok);
+        throw new Error(`Impossible de charger le fichier CSV. Status: ${response?.status}`);
+      }
+      
+      const text = await response.text();
+      console.log('Contenu CSV reçu (premiers 200 chars):', text.substring(0, 200));
+      
+      const rows = text.trim().split('\n').filter(row => row.trim());
+      if (rows.length === 0) {
+        throw new Error('Le fichier CSV est vide');
+      }
+      
+      const headers = rows[0].split(',').map(h => h.trim());
+      
+      const data = rows.slice(1).map((row, rowIndex) => {
+        const values = row.split(',').map(v => v.trim());
+        const obj = {};
+        headers.forEach((header, index) => {
+          const value = values[index];
+          obj[header] = isNaN(value) ? value : parseFloat(value);
+        });
+        return obj;
+      });
+      
+      console.log('Données CSV chargées:', data);
+      console.log('Nombre de lignes:', data.length);
+      setCsvData(data);
+    } catch (err) {
+      console.error('Erreur chargement CSV:', err);
+      setError(`Erreur lors du chargement du CSV: ${err.message}`);
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
+  // Trier les données
+  const getSortedData = () => {
+    if (csvData.length === 0) return [];
+    
+    const sorted = [...csvData];
+    sorted.sort((a, b) => {
+      const aVal = a[sortBy];
+      const bVal = b[sortBy];
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return bVal - aVal;
+      }
+      
+      return String(aVal).localeCompare(String(bVal));
+    });
+    
+    return sorted;
+  };
+
   // Filtrer par recherche
   const filteredStats = stats.filter(stat =>
-    stat.country?.toLowerCase().includes(searchTerm.toLowerCase())
+    stat.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Calculer les totaux
@@ -284,6 +370,9 @@ export function StatsPage() {
   const totalSilver = filteredStats.reduce((sum, s) => sum + (s.silver || 0), 0);
   const totalBronze = filteredStats.reduce((sum, s) => sum + (s.bronze || 0), 0);
   const totalMedals = totalGold + totalSilver + totalBronze;
+
+  const currentDataset = datasets[currentDatasetIndex];
+  const sortedCsvData = getSortedData();
 
   if (loading && stats.length === 0) {
     return (
@@ -293,210 +382,255 @@ export function StatsPage() {
     );
   }
 
+  // Styles supplémentaires pour les boutons de navigation
+  const buttonStyles = {
+    navButton: {
+      padding: '10px 20px',
+      backgroundColor: '#0085C7',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'background-color 0.3s'
+    },
+    navButtonDisabled: {
+      padding: '10px 20px',
+      backgroundColor: '#ccc',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'not-allowed',
+      fontSize: '14px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    datasetNav: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '15px',
+      justifyContent: 'space-between',
+      backgroundColor: 'white',
+      padding: '20px 25px',
+      borderRadius: '15px',
+      marginBottom: '30px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      flexWrap: 'wrap'
+    },
+    datasetInfo: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '15px',
+      flex: 1
+    },
+    datasetTitle: {
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: '#0085C7'
+    },
+    datasetPath: {
+      fontSize: '14px',
+      color: '#666'
+    },
+    chartContainer: {
+      backgroundColor: 'white',
+      borderRadius: '15px',
+      padding: '30px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      marginBottom: '30px'
+    },
+    chartTitle: {
+      fontSize: '20px',
+      fontWeight: 'bold',
+      color: '#0085C7',
+      marginBottom: '20px'
+    },
+    chart: {
+      width: '100%',
+      height: '400px',
+      backgroundColor: '#f9fafb',
+      borderRadius: '10px',
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'space-around',
+      padding: '20px',
+      gap: '10px'
+    },
+    chartBar: (height, maxHeight) => ({
+      flex: 1,
+      height: `${Math.max((height / maxHeight) * 350, 20)}px`,
+      backgroundColor: '#0085C7',
+      borderRadius: '5px 5px 0 0',
+      position: 'relative',
+      minHeight: '20px',
+      cursor: 'pointer',
+      transition: 'background-color 0.3s'
+    }),
+    chartBarLabel: {
+      fontSize: '12px',
+      color: '#666',
+      marginTop: '10px',
+      textAlign: 'center',
+      width: '100%'
+    }
+  };
+
   return (
     <div style={styles.pageContainer}>
       <div style={styles.container}>
         {/* En-tête */}
         <div style={styles.header}>
-          <h1 style={styles.title}>Statistiques Olympiques</h1>
+          <h1 style={styles.title}>Statistiques - Analyse CSV</h1>
           <p style={styles.subtitle}>
-            Tableau des médailles et performances par pays
+            Visualisation et analyse des données des datasets
           </p>
         </div>
 
-        {/* Cartes de résumé */}
-        <div style={styles.summaryCards}>
-          <div style={styles.summaryCard}>
-            <div style={styles.iconContainer('#FFD700')}>
-              <Trophy size={30} color="white" />
-            </div>
-            <div style={styles.summaryContent}>
-              <div style={styles.summaryLabel}>Total Médailles</div>
-              <div style={styles.summaryValue}>{totalMedals}</div>
-            </div>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <div style={styles.iconContainer('#FFD700')}>
-              <Medal size={30} color="white" />
-            </div>
-            <div style={styles.summaryContent}>
-              <div style={styles.summaryLabel}>Médailles d'Or</div>
-              <div style={styles.summaryValue}>{totalGold}</div>
-            </div>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <div style={styles.iconContainer('#C0C0C0')}>
-              <Medal size={30} color="white" />
-            </div>
-            <div style={styles.summaryContent}>
-              <div style={styles.summaryLabel}>Médailles d'Argent</div>
-              <div style={styles.summaryValue}>{totalSilver}</div>
-            </div>
-          </div>
-
-          <div style={styles.summaryCard}>
-            <div style={styles.iconContainer('#CD7F32')}>
-              <Medal size={30} color="white" />
-            </div>
-            <div style={styles.summaryContent}>
-              <div style={styles.summaryLabel}>Médailles de Bronze</div>
-              <div style={styles.summaryValue}>{totalBronze}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filtres */}
-        <div style={styles.filtersContainer}>
-          <div style={styles.filtersGrid}>
-            {/* Recherche */}
-            <div style={styles.filterGroup}>
-              <label style={styles.label}>Rechercher un pays</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  placeholder="France, USA..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={styles.input}
-                  onFocus={(e) => e.target.style.borderColor = '#0085C7'}
-                  onBlur={(e) => e.target.style.borderColor = '#D9D9D9'}
-                />
-                <Search
-                  size={20}
-                  style={{
-                    position: 'absolute',
-                    right: '15px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#999'
-                  }}
-                />
+        {/* Navigation entre datasets */}
+        {datasets.length > 0 && (
+          <div style={buttonStyles.datasetNav}>
+            <div style={buttonStyles.datasetInfo}>
+              <div>
+                <div style={buttonStyles.datasetTitle}>
+                  {currentDataset?.name || 'Dataset'}
+                </div>
+                <div style={buttonStyles.datasetPath}>
+                  📁 {currentDataset?.path}
+                </div>
               </div>
             </div>
-
-            {/* Édition */}
-            <div style={styles.filterGroup}>
-              <label style={styles.label}>Édition</label>
-              <select
-                value={selectedEdition}
-                onChange={(e) => setSelectedEdition(e.target.value)}
-                style={styles.select}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setCurrentDatasetIndex(Math.max(0, currentDatasetIndex - 1))}
+                style={currentDatasetIndex === 0 ? buttonStyles.navButtonDisabled : buttonStyles.navButton}
+                onMouseEnter={(e) => {
+                  if (currentDatasetIndex > 0) e.target.style.backgroundColor = '#0073a8';
+                }}
+                onMouseLeave={(e) => {
+                  if (currentDatasetIndex > 0) e.target.style.backgroundColor = '#0085C7';
+                }}
+                disabled={currentDatasetIndex === 0}
               >
-                <option value="all">Toutes les éditions</option>
-                <option value="paris2024">Paris 2024</option>
-                <option value="tokyo2020">Tokyo 2020</option>
-                <option value="rio2016">Rio 2016</option>
-                <option value="london2012">Londres 2012</option>
-              </select>
-            </div>
+                <ChevronLeft size={20} />
+                Précédent
+              </button>
+              
+              <div style={{
+                padding: '10px 15px',
+                backgroundColor: '#f0f0f0',
+                borderRadius: '8px',
+                alignSelf: 'center',
+                fontSize: '14px',
+                fontWeight: '600'
+              }}>
+                {currentDatasetIndex + 1} / {datasets.length}
+              </div>
 
-            {/* Sport */}
-            <div style={styles.filterGroup}>
-              <label style={styles.label}>Sport</label>
-              <select
-                value={selectedSport}
-                onChange={(e) => setSelectedSport(e.target.value)}
-                style={styles.select}
+              <button
+                onClick={() => setCurrentDatasetIndex(Math.min(datasets.length - 1, currentDatasetIndex + 1))}
+                style={currentDatasetIndex === datasets.length - 1 ? buttonStyles.navButtonDisabled : buttonStyles.navButton}
+                onMouseEnter={(e) => {
+                  if (currentDatasetIndex < datasets.length - 1) e.target.style.backgroundColor = '#0073a8';
+                }}
+                onMouseLeave={(e) => {
+                  if (currentDatasetIndex < datasets.length - 1) e.target.style.backgroundColor = '#0085C7';
+                }}
+                disabled={currentDatasetIndex === datasets.length - 1}
               >
-                <option value="all">Tous les sports</option>
-                <option value="athletisme">Athlétisme</option>
-                <option value="natation">Natation</option>
-                <option value="gymnastique">Gymnastique</option>
-                <option value="judo">Judo</option>
-                <option value="cyclisme">Cyclisme</option>
-              </select>
-            </div>
-
-            {/* Tri */}
-            <div style={styles.filterGroup}>
-              <label style={styles.label}>Trier par</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                style={styles.select}
-              >
-                <option value="total">Total médailles</option>
-                <option value="gold">Médailles d'or</option>
-                <option value="silver">Médailles d'argent</option>
-                <option value="bronze">Médailles de bronze</option>
-              </select>
+                Suivant
+                <ChevronRight size={20} />
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Erreur */}
         {error && <div style={styles.error}>{error}</div>}
 
-        {/* Tableau des médailles */}
-        {filteredStats.length === 0 ? (
-          <div style={styles.emptyState}>
-            <div style={{ fontSize: '64px', marginBottom: '20px' }}>🏅</div>
-            <p style={{ fontSize: '18px' }}>Aucune statistique trouvée</p>
+        {/* Graphique */}
+        {csvLoading ? (
+          <div style={styles.chartContainer}>
+            <div style={styles.loading}>Chargement du fichier CSV...</div>
+          </div>
+        ) : sortedCsvData.length > 0 ? (
+          <div style={styles.chartContainer}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={styles.chartTitle}>📊 Visualisation graphique</div>
+              <div style={styles.filterGroup}>
+                <label style={styles.label}>Trier par colonne</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  style={styles.select}
+                >
+                  {sortedCsvData.length > 0 && Object.keys(sortedCsvData[0]).map(key => (
+                    <option key={key} value={key}>{key}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            <div style={buttonStyles.chart}>
+              {sortedCsvData.slice(0, 10).map((item, index) => {
+                const numericColumns = Object.values(item).filter(v => typeof v === 'number');
+                const maxValue = Math.max(...numericColumns, 1);
+                const firstKey = Object.keys(item)[0];
+                const value = item[sortBy] || item[firstKey];
+                
+                return (
+                  <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div
+                      style={buttonStyles.chartBar(value, maxValue)}
+                      title={`${firstKey}: ${value}`}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#0073a8'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#0085C7'}
+                    />
+                    <div style={buttonStyles.chartBarLabel}>{String(item[firstKey]).substring(0, 8)}</div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tableau des données CSV */}
+            <div style={{ marginTop: '40px' }}>
+              <h3 style={styles.chartTitle}>📋 Données brutes</h3>
+              <div style={styles.tableContainer}>
+                <table style={styles.table}>
+                  <thead style={styles.thead}>
+                    <tr>
+                      {sortedCsvData.length > 0 && Object.keys(sortedCsvData[0]).map(key => (
+                        <th key={key} style={styles.th}>{key}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedCsvData.map((row, index) => (
+                      <tr
+                        key={index}
+                        style={styles.tr}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        {Object.values(row).map((value, idx) => (
+                          <td key={idx} style={styles.td}>{value}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         ) : (
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
-              <thead style={styles.thead}>
-                <tr>
-                  <th style={styles.th}>Rang</th>
-                  <th style={styles.th}>Pays</th>
-                  <th style={styles.thCenter}>🥇 Or</th>
-                  <th style={styles.thCenter}>🥈 Argent</th>
-                  <th style={styles.thCenter}>🥉 Bronze</th>
-                  <th style={styles.thCenter}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStats.map((stat, index) => (
-                  <tr
-                    key={stat.id || index}
-                    style={styles.tr}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <td style={styles.td}>
-                      <div style={styles.rank(index + 1)}>
-                        {index + 1}
-                      </div>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={styles.country}>
-                        <span style={styles.flag}>{stat.flag || '🏳️'}</span>
-                        <span>{stat.country || 'Pays inconnu'}</span>
-                      </div>
-                    </td>
-                    <td style={styles.tdCenter}>
-                      <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <div style={styles.medalBadge('gold')}>
-                          {stat.gold || 0}
-                        </div>
-                      </div>
-                    </td>
-                    <td style={styles.tdCenter}>
-                      <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <div style={styles.medalBadge('silver')}>
-                          {stat.silver || 0}
-                        </div>
-                      </div>
-                    </td>
-                    <td style={styles.tdCenter}>
-                      <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <div style={styles.medalBadge('bronze')}>
-                          {stat.bronze || 0}
-                        </div>
-                      </div>
-                    </td>
-                    <td style={styles.tdCenter}>
-                      <div style={styles.total}>
-                        {(stat.gold || 0) + (stat.silver || 0) + (stat.bronze || 0)}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={styles.emptyState}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>📊</div>
+            <p style={{ fontSize: '18px' }}>Aucune donnée CSV disponible</p>
           </div>
         )}
       </div>

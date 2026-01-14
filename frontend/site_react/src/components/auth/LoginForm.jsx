@@ -283,6 +283,8 @@ export function LoginForm() {
             });
 
             console.log('status : ', response.status);
+            console.log(response);
+            
             
 
             if (!response.ok) {
@@ -290,7 +292,7 @@ export function LoginForm() {
             }
 
             const data = await response.json();
-            // console.log("Réponse complète:", data);
+            console.log("Réponse complète:", data);
 
             // Stocker le token
             localStorage.setItem("authToken", data.token);

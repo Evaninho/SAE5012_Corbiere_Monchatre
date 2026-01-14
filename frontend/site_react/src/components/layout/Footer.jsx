@@ -135,7 +135,7 @@ export function Footer() {
     const accountLinks = [
         { to: "/login", label: "Se connecter" },
         { to: "/register", label: "Créer un compte" },
-        { to: "/profil", label: "Mon profil" },
+        { to: "/profile", label: "Mon profil" },
         { to: "/abonnement", label: "Abonnements" }
     ];
 

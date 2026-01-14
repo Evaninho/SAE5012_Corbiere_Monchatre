@@ -23,7 +23,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
             security: "is_granted('ROLE_USER')"
         ),
         new Put(
-            security: "object.getAuthor() == user or is_granted('ROLE_ADMIN')"
+            security: "object.getAuthor() == user or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"
         ),
         new Delete(
             security: "is_granted('ROLE_ADMIN')"

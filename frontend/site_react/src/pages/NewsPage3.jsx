@@ -2,15 +2,37 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "../components/news/search";
-import { MessageSquare, Heart, Star } from "lucide-react";
+import { MessageSquare, Heart, Star, Plus } from "lucide-react";
+import { usePermissions } from '../hooks/usePermissions';
 
 // ========== CONSTANTE API ==========
 const API_BASE_URL = 'http://localhost:8000/api';
+
+// ========== STYLES ==========
+const styles = {
+  createButton: {
+    marginTop: '20px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '12px 24px',
+    backgroundColor: '#009F3D',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '15px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 8px rgba(0,159,61,0.2)'
+  }
+};
 
 export function NewsPage3() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [favorites, setFavorites] = useState({});
+  const { can } = usePermissions();
 
   // =======================
   // FETCH ARTICLES (UN SEUL)
@@ -96,6 +118,26 @@ export function NewsPage3() {
         <p style={{ color: '#666' }}>
           Découvrez les dernières actualités olympiques
         </p>
+        {/* Bouton "Créer un article" - Visible uniquement pour AUTHOR, EDITOR, ADMIN */}
+        {can('canCreateArticles') && (
+          <button
+            style={styles.createButton}
+            onClick={() => navigate('/create-article')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#007a33';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,159,61,0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#009F3D';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,159,61,0.2)';
+            }}
+          >
+            <Plus size={20} />
+            <span>Créer un article</span>
+          </button>
+        )}
       </div>
 
       {/* SEARCH */}

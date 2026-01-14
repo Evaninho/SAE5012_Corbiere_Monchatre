@@ -214,8 +214,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getRoles(): array
     {
         $roles = $this->roles;
-        // guarantee every user at least has ROLE_USER
-        $roles[] = 'ROLE_USER';
+        // Ne pas ajouter ROLE_USER si l'utilisateur a déjà un rôle supérieur
+        $hasHigherRole = in_array('ROLE_ADMIN', $roles) 
+                      || in_array('ROLE_DATA_PROVIDER', $roles)
+                      || in_array('ROLE_EDITOR', $roles)
+                      || in_array('ROLE_AUTHOR', $roles);
+        
+        if (!$hasHigherRole && !in_array('ROLE_USER', $roles)) {
+            $roles[] = 'ROLE_USER';
+        }
 
         return array_unique($roles);
     }
