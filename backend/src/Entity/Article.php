@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\ArticleRepository;
+use App\State\ArticleProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
@@ -11,6 +12,7 @@ use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Delete};
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: ArticleRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[ApiResource(
     operations: [
         new Get(
@@ -20,7 +22,8 @@ use Symfony\Component\Serializer\Annotation\Groups;
             security: "true"
         ),
         new Post(
-            security: "is_granted('ROLE_USER')"
+            security: "is_granted('ROLE_AUTHOR') or is_granted('ROLE_EDITOR')",
+            processor: ArticleProcessor::class
         ),
         new Put(
             security: "object.getAuthor() == user or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"
@@ -46,7 +49,7 @@ class Article
 
     private ?string $title = null;
 
-    #[ORM\Column(type: Types::TEXT)]
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['article:read', 'article:write'])]
 
     private ?string $content = null;
@@ -62,7 +65,7 @@ class Article
     private ?\DateTime $updatedAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'articles')]
-    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\JoinColumn(nullable: true)]
     #[Groups(['article:read', 'article:write'])]
 
     private ?User $author = null;
@@ -212,5 +215,15 @@ class Article
         }
 
         return $this;
+    }
+
+    // ===== Lifecycle Callbacks =====
+    
+    #[ORM\PrePersist]
+    public function setCreatedAtValue(): void
+    {
+        if ($this->createdAt === null) {
+            $this->createdAt = new \DateTimeImmutable();
+        }
     }
 }

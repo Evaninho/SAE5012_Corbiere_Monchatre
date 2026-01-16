@@ -389,6 +389,105 @@ export default function OlympicsDataViz() {
     }
   };
 
+  // Styles supplémentaires pour les boutons de navigation
+  const buttonStyles = {
+    navButton: {
+      padding: '10px 20px',
+      backgroundColor: '#0085C7',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'background-color 0.3s'
+    },
+    navButtonDisabled: {
+      padding: '10px 20px',
+      backgroundColor: '#ccc',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'not-allowed',
+      fontSize: '14px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    datasetNav: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '15px',
+      justifyContent: 'space-between',
+      backgroundColor: 'white',
+      padding: '20px 25px',
+      borderRadius: '15px',
+      marginBottom: '30px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      flexWrap: 'wrap'
+    },
+    datasetInfo: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '15px',
+      flex: 1
+    },
+    datasetTitle: {
+      fontSize: '18px',
+      fontWeight: 'bold',
+      color: '#0085C7'
+    },
+    datasetPath: {
+      fontSize: '14px',
+      color: '#666'
+    },
+    chartContainer: {
+      backgroundColor: 'white',
+      borderRadius: '15px',
+      padding: '30px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      marginBottom: '30px'
+    },
+    chartTitle: {
+      fontSize: '20px',
+      fontWeight: 'bold',
+      color: '#0085C7',
+      marginBottom: '20px'
+    },
+    chart: {
+      width: '100%',
+      height: '400px',
+      backgroundColor: '#f9fafb',
+      borderRadius: '10px',
+      display: 'flex',
+      alignItems: 'flex-end',
+      justifyContent: 'space-around',
+      padding: '20px',
+      gap: '10px'
+    },
+    chartBar: (height, maxHeight) => ({
+      flex: 1,
+      height: `${Math.max((height / maxHeight) * 350, 20)}px`,
+      backgroundColor: '#0085C7',
+      borderRadius: '5px 5px 0 0',
+      position: 'relative',
+      minHeight: '20px',
+      cursor: 'pointer',
+      transition: 'background-color 0.3s'
+    }),
+    chartBarLabel: {
+      fontSize: '12px',
+      color: '#666',
+      marginTop: '10px',
+      textAlign: 'center',
+      width: '100%'
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>

@@ -44,13 +44,10 @@ class RoleController extends AbstractController
         }
 
         $role = $allowedRoles[$roleName];
-        $roles = $user->getRoles();
 
-        if (!in_array($role, $roles)) {
-            $roles[] = $role;
-            $user->setRoles(array_values($roles));
-            $this->em->flush();
-        }
+        // Remplacer le rôle au lieu de l'ajouter
+        $user->setRoles([$role]);
+        $this->em->flush();
 
         return new JsonResponse([
             'success' => true,

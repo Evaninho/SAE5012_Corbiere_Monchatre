@@ -12,92 +12,21 @@ export function NewsDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // États pour les ratings (stars + comments combinés)
-  const [ratings, setRatings] = useState([]); // Liste de tous les ratings
-  const [userRating, setUserRating] = useState(null); // Rating du user actuel
+  const [ratings, setRatings] = useState([]);
   const [averageStars, setAverageStars] = useState(0);
+
+  // ⭐ formulaire
+  const [newComment, setNewComment] = useState("");
+  const [newStars, setNewStars] = useState(0);
   const [hoveredStar, setHoveredStar] = useState(0);
 
-  // États pour nouveau commentaire
-  const [newComment, setNewComment] = useState("");
-  
-  // États favoris
+  const getToken = () => localStorage.getItem('authToken');
+  const isLoggedIn = !!getToken();
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const getToken = () => localStorage.getItem('authToken');
-  const getUserId = () => {
-    const userData = localStorage.getItem('userData');
-    return userData ? JSON.parse(userData).id : null;
-  };
-  const isLoggedIn = !!getToken();
-  const currentUserId = getUserId();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-useEffect(() => {
-  loadArticle();
-}, [id]);
 
-const loadArticle = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-
-    const response = await fetch(`${API_BASE_URL}/articles/${id}`);
-    if (!response.ok) throw new Error('Article non trouvé');
-
-    const data = await response.json();
-    setArticle(data);
-    // console.log(data);
-
-    // ===============================
-    // RATINGS DIRECTEMENT DE L'ARTICLE
-    // ===============================
-    const ratingsData = data.ratings || [];
-    setRatings(ratingsData);
-
-    // Moyenne des étoiles
-    const ratingsWithStars = ratingsData.filter(r => r.stars > 0);
-    if (ratingsWithStars.length > 0) {
-      const avg =
-        ratingsWithStars.reduce((sum, r) => sum + r.stars, 0) /
-        ratingsWithStars.length;
-      setAverageStars(avg);
-    } else {
-      setAverageStars(0);
-    }
-
-    // Rating de l'utilisateur connecté
-    if (currentUserId) {
-      const myRating = ratingsData.find(
-        r => r.user?.id === currentUserId
-      );
-      setUserRating(myRating || null);
-    }
-
-    // Incrémenter les vues
-    fetch(`${API_BASE_URL}/articles/${id}/view`, { method: 'POST' });
-
-  } catch (err) {
-    console.error('Erreur chargement:', err);
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // ========== PARTAGER ==========
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: article.title,
-        url: window.location.href
-      });
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-      alert('Lien copié !');
-    }
-  };
-
-  // ========== STYLES ==========
   const styles = {
     pageContainer: {
       minHeight: '100vh',
@@ -219,39 +148,106 @@ const loadArticle = async () => {
     }
   };
 
-  // ========== LOADING / ERROR ==========
+  useEffect(() => {
+    loadArticle();
+  }, [id]);
+
+  const loadArticle = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(`${API_BASE_URL}/articles/${id}`);
+      if (!response.ok) throw new Error('Article non trouvé');
+
+      const data = await response.json();
+      console.log(data);
+
+      setArticle(data);
+      
+      // const test = await fetch(`${API_BASE_URL}/ratings`);
+      // const datatest = await test.json();
+
+      // console.log(datatest);
+      
+
+      const ratingsData = data.ratings || [];
+      setRatings(ratingsData);
+
+      const withStars = ratingsData.filter(r => r.stars > 0);
+      setAverageStars(
+        withStars.length
+          ? withStars.reduce((s, r) => s + r.stars, 0) / withStars.length
+          : 0
+      );
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({ title: article.title, url: window.location.href });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      alert('Lien copié !');
+    }
+  };
+
+  // ========== AJOUT COMMENTAIRE + NOTE ==========
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    
+    if (!newComment.trim() && newStars === 0) return;
+
+    setIsSubmitting(true);
+    console.log(newComment, ' ', newStars);
+    
+
+    try {
+      await fetch(`${API_BASE_URL}/ratings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/ld+json',
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+          comment: newComment,
+          stars: newStars,
+          article: `/api/articles/${id}`
+        })
+      });
+      console.log('Commentaire envoyé avec succès');
+
+      setNewComment("");
+      setNewStars(0);
+      setHoveredStar(0);
+      await loadArticle();
+
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi:', error);
+      alert('Erreur lors de la publication du commentaire');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '100px', minHeight: '100vh', fontSize: '20px', color: '#666' }}>
-        Chargement...
-      </div>
-    );
+    return <div style={{ minHeight: '100vh', textAlign: 'center', padding: '100px', fontSize:'20px' }}>Chargement...</div>;
   }
 
   if (error || !article) {
-    return (
-      <div style={styles.pageContainer}>
-        <div style={{ textAlign: 'center', padding: '100px' }}>
-          <p style={{ fontSize: '24px', color: '#dc2626', marginBottom: '20px' }}>
-            Article introuvable
-          </p>
-          <button onClick={() => navigate('/actualites')} style={styles.backButton}>
-            Retour aux actualités
-          </button>
-        </div>
-      </div>
-    );
+    return <div style={{minHeight: '100vh', textAlign: 'center', padding: '100px', fontSize:'20px' }}>Article introuvable</div>;
   }
 
   const sortedBlocks = [...article.blocks].sort((a, b) => a.orderIndex - b.orderIndex);
-
-  // Séparer les ratings en : ceux avec commentaires vs ceux sans
-  const ratingsWithComments = ratings.filter(r => r.comment && r.comment.trim() !== '');
-  const totalRatings = ratings.filter(r => r.stars > 0).length;
+  const ratingsWithComments = ratings.filter(r => r.comment);
 
   return (
-    <div style={styles.pageContainer}>
-      {/* BOUTON RETOUR */}
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+      {/* RETOUR */}
       <button
         style={styles.backButton}
         onClick={() => navigate('/actualites')}
@@ -267,33 +263,25 @@ const loadArticle = async () => {
         <div style={styles.header}>
           <h1 style={styles.title}>{article.title}</h1>
 
-          {/* ACTIONS */}
           <div style={styles.actionsBar}>
-            {/* NOTATION */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '14px', fontWeight: '600' }}>Votre note :</span>
-              <div style={{ display: 'flex', gap: '5px' }}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    onClick={() => handleRate(star)}
-                    onMouseEnter={() => setHoveredStar(star)}
-                    onMouseLeave={() => setHoveredStar(0)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  >
-                    <Star
-                      size={24}
-                      color="#FFD700"
-                      fill={star <= (hoveredStar || userRating?.stars || 0) ? '#FFD700' : 'transparent'}
-                    />
-                  </button>
-                ))}
-              </div>
-              {averageStars > 0 && (
-                <span style={{ fontSize: '14px', color: '#666' }}>
-                  {averageStars.toFixed(1)}/5 ({totalRatings} {totalRatings > 1 ? 'notes' : 'note'})
-                </span>
-              )}
+            {/* 📅 date article */}
+            <p style={{ fontSize: '13px', color: '#999', marginBottom: '15px' }}>
+              Publié le {new Date(article.createdAt).toLocaleDateString('fr-FR')}
+            </p>
+
+            {/* NOTE MOYENNE */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <Star
+                  key={star}
+                  size={22}
+                  color="#FFD700"
+                  fill={star <= Math.round(averageStars) ? '#FFD700' : 'transparent'}
+                />
+              ))}
+              <span style={{ color: '#666' }}>
+                {averageStars.toFixed(1)}/5
+              </span>
             </div>
 
             {/* FAVORI */}
@@ -315,127 +303,94 @@ const loadArticle = async () => {
               Partager
             </button>
           </div>
+
+
         </div>
 
-        {/* CONTENU (BLOCKS) */}
-        <div style={styles.content}>
-          {sortedBlocks.map((block) => {
+        {/* CONTENU */}
+        <div style={{ background: 'white', borderRadius: '15px', padding: '30px', marginBottom: '20px' }}>
+          {sortedBlocks.map(block => {
             if (block.type === 'text') {
-              return (
-                <p key={block.id} style={{ marginBottom: '20px', lineHeight: 1.7, fontSize: '16px', color: '#333' }}>
-                  {block.content?.text}
-                </p>
-              );
+              return <p key={block.id} style={{ marginBottom: '20px' }}>{block.content?.text}</p>;
             }
-
             if (block.type === 'image') {
-              return (
-                <img
-                  key={block.id}
-                  src={block.content?.url}
-                  alt=""
-                  style={{ width: '100%', borderRadius: '14px', marginBottom: '25px', objectFit: 'cover' }}
-                />
-              );
+              return <img key={block.id} src={block.content?.url} alt="" style={{ width: '100%', borderRadius: '14px', marginBottom: '25px' }} />;
             }
-
-            if (block.type === 'visualization') {
-              return (
-                <div
-                  key={block.id}
-                  style={{
-                    height: '220px',
-                    background: '#f0f4f8',
-                    borderRadius: '14px',
-                    marginBottom: '25px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#666',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  📊 Visualisation
-                </div>
-              );
-            }
-
             return null;
           })}
         </div>
 
-        {/* SECTION COMMENTAIRES */}
-        <div style={styles.commentsSection}>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
+        {/* COMMENTAIRES */}
+        <div style={{ background: 'white', borderRadius: '15px', padding: '30px' }}>
+          <h2 style={{ fontSize: '24px', marginBottom: '20px' }}>
             💬 Commentaires ({ratingsWithComments.length})
           </h2>
 
-          {/* FORMULAIRE */}
-          {isLoggedIn ? (
-            <div style={{ marginBottom: '30px' }}>
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Ajouter un commentaire..."
-                style={styles.textarea}
-                onFocus={(e) => e.target.style.borderColor = '#0085C7'}
-                onBlur={(e) => e.target.style.borderColor = '#D9D9D9'}
-              />
-              {/* <button onClick={handleAddComment} style={styles.submitButton}>
-                <Send size={16} />
-                Publier
-              </button> */}
-            </div>
-          ) : (
-            <div style={{
-              backgroundColor: '#f0f9ff',
-              border: '2px solid #0085C7',
-              borderRadius: '10px',
-              padding: '20px',
-              textAlign: 'center',
-              color: '#0085C7',
-              fontWeight: '600',
-              marginBottom: '30px'
-            }}>
-              Vous devez être connecté pour commenter
-            </div>
-          )}
-
-          {/* LISTE DES COMMENTAIRES */}
-          {ratingsWithComments.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-              Aucun commentaire. Soyez le premier !
-            </p>
-          ) : (
-            ratingsWithComments.map((rating) => (
-              <div key={rating.id} style={styles.comment}>
-                <div style={styles.commentHeader}>
-                  <div style={styles.avatar}>
-                    {rating.user?.name?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: '600', fontSize: '14px' }}>
-                      {rating.user?.name || 'Utilisateur'}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#999' }}>
-                      {new Date(rating.created_at).toLocaleDateString('fr-FR')}
-                    </div>
-                  </div>
-                  {/* Afficher les étoiles si le user a noté */}
-                  {rating.stars > 0 && (
-                    <div style={{ marginLeft: 'auto', display: 'flex', gap: '2px' }}>
-                      {[...Array(rating.stars)].map((_, i) => (
-                        <Star key={i} size={14} color="#FFD700" fill="#FFD700" />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <p style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
-                  {rating.comment}
-                </p>
+          {/* LISTE */}
+          {ratingsWithComments.map(rating => (
+            <div key={rating.id} style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '15px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <strong> {data.author?.pseudo ?? 'Utilisateur'}</strong>
+                <span style={{ fontSize: '12px', color: '#999' }}>
+                  {new Date(rating.createdAt).toLocaleDateString('fr-FR')}
+                </span>
               </div>
-            ))
-          )}
+
+              <div style={{ display: 'flex', gap: '3px', margin: '5px 0' }}>
+                {[...Array(rating.stars)].map((_, i) => (
+                  <Star key={i} size={14} color="#FFD700" fill="#FFD700" />
+                ))}
+              </div>
+
+              <p style={{ fontSize: '14px' }}>{rating.comment}</p>
+            </div>
+          ))}
+
+          {/* <hr style={{ color: 'gray' }} /> */}
+
+          {/* FORMULAIRE */}
+          <form onSubmit={handleAddComment}>
+            {isLoggedIn && (
+              <div style={{ marginBottom: '30px', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
+                {/* ⭐ étoiles */}
+                <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onMouseEnter={() => setHoveredStar(star)}
+                      onMouseLeave={() => setHoveredStar(0)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setNewStars(star);
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      <Star
+                        size={20}
+                        color="#FFD700"
+                        fill={star <= (hoveredStar || newStars) ? '#FFD700' : 'transparent'}
+                      />
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Ajouter un commentaire..."
+                  style={styles.textarea}
+                  onFocus={(e) => e.target.style.borderColor = '#0085C7'}
+                  onBlur={(e) => e.target.style.borderColor = '#D9D9D9'}
+                />
+
+                <button type="submit" disabled={isSubmitting} style={styles.submitButton}>
+                  <Send size={16} />
+                  {isSubmitting ? 'Publication...' : 'Publier'}
+                </button>
+              </div>
+            )}
+          </form>
         </div>
       </div>
     </div>

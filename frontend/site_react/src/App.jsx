@@ -16,6 +16,7 @@ import { NewsPage } from './pages/NewsPage.jsx'
 import { NewsPage2 } from './pages/NewsPage2.jsx'
 import { NewsPage3 } from './pages/NewsPage3.jsx'
 import { NewsDetailPage } from './pages/NewsDetailPage.jsx'
+import { CreateArticlePage } from './pages/CreateArticlePage.jsx'
 
 import { GameIntroPage } from './pages/GameIntroPage.jsx'
 import { ContactPage } from './pages/ContactPage.jsx'
@@ -24,7 +25,9 @@ import { AccountPage } from './pages/AccountPage.jsx'
 
 import { ProfilePage} from './components/profile/profil.jsx'
 import { SubscriptionPage} from './components/profile/subprofil.jsx'
-import  SettingsPage from './components/profile/parametre.jsx'
+// import { SubscriptionPage} from './components/profile/subtest.jsx'
+
+import  { SettingsPage } from './components/profile/parametre.jsx'
 
 
 
@@ -56,6 +59,7 @@ function App() {
 
         {/* ----- article ----- */}
         <Route path="/articles/:id" element={<NewsDetailPage />} />
+        <Route path="/create-article" element={<CreateArticlePage />} />
 
       </Routes>
       <Footer />

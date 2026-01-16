@@ -1,193 +1,212 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
+import { ResetPasswordModal } from '../commun/PasswordResetModal';
+import { Lock, Bell, Shield, Trash2 } from 'lucide-react';
 
-/* ================= COULEURS GLOBALES ================= */
+export function SettingsPage() {
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
-const colors = {
-  blue: "#0085C7",
-  green: "#009F3D",
-  grayBg: "#f5f5f5",
-  grayBorder: "#e5e7eb",
-  grayText: "#6b7280",
-  danger: "#dc2626",
-};
+  const styles = {
+    pageContainer: {
+      minHeight: '100vh',
+      backgroundColor: '#f5f5f5',
+      padding: '40px 20px',
+      fontFamily: 'Arial, sans-serif'
+    },
+    container: {
+      maxWidth: '900px',
+      margin: '0 auto'
+    },
+    title: {
+      fontSize: '36px',
+      fontWeight: 'bold',
+      color: '#0085C7',
+      marginBottom: '40px'
+    },
+    section: {
+      backgroundColor: 'white',
+      borderRadius: '15px',
+      padding: '30px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      marginBottom: '25px'
+    },
+    sectionTitle: {
+      fontSize: '20px',
+      fontWeight: 'bold',
+      marginBottom: '20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px',
+      color: '#333'
+    },
+    settingItem: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '15px 0',
+      borderBottom: '1px solid #f3f4f6'
+    },
+    settingLabel: {
+      fontSize: '15px',
+      color: '#555',
+      fontWeight: '500'
+    },
+    button: {
+      padding: '10px 20px',
+      border: '2px solid #0085C7',
+      backgroundColor: 'transparent',
+      color: '#0085C7',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontWeight: '600',
+      fontSize: '14px',
+      transition: 'all 0.2s'
+    },
+    dangerButton: {
+      padding: '10px 20px',
+      border: '2px solid #dc2626',
+      backgroundColor: 'transparent',
+      color: '#dc2626',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontWeight: '600',
+      fontSize: '14px',
+      transition: 'all 0.2s'
+    },
+    toggle: {
+      width: '50px',
+      height: '26px',
+      backgroundColor: '#10b981',
+      borderRadius: '13px',
+      position: 'relative',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s'
+    },
+    toggleBall: {
+      width: '22px',
+      height: '22px',
+      backgroundColor: 'white',
+      borderRadius: '50%',
+      position: 'absolute',
+      top: '2px',
+      right: '2px',
+      transition: 'transform 0.2s'
+    }
+  };
 
-/* ================= PAGE ================= */
-
-const SettingsPage = () => {
   return (
-    <main style={pageStyle}>
-      <div style={containerStyle}>
-        {/* Header */}
-        <div style={headerStyle}>
-          <h1 style={titleStyle}>Paramètres</h1>
-          <p style={subtitleStyle}>
-            Gérez vos préférences, votre confidentialité et votre compte
-          </p>
+    <div style={styles.pageContainer}>
+      <div style={styles.container}>
+        <h1 style={styles.title}>Paramètres</h1>
+
+        {/* Section Notifications */}
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            <Bell size={24} />
+            Notifications
+          </h2>
+          <div style={styles.settingItem}>
+            <span style={styles.settingLabel}>Notifications par email</span>
+            <div style={styles.toggle}>
+              <div style={styles.toggleBall}></div>
+            </div>
+          </div>
+          <div style={styles.settingItem}>
+            <span style={styles.settingLabel}>Actualités importantes</span>
+            <div style={styles.toggle}>
+              <div style={styles.toggleBall}></div>
+            </div>
+          </div>
+          <div style={{...styles.settingItem, borderBottom: 'none'}}>
+            <span style={styles.settingLabel}>Nouveaux commentaires</span>
+            <div style={styles.toggle}>
+              <div style={styles.toggleBall}></div>
+            </div>
+          </div>
         </div>
 
-        {/* Sections */}
-        <div style={sectionsWrapper}>
-          <SettingsCard title="Préférences de notification">
-            <SettingToggle label="Notifications par email" />
-            <SettingToggle label="Actualités importantes" />
-            <SettingToggle label="Nouveaux commentaires" />
-            <SettingToggle label="Résultats des jeux" />
-          </SettingsCard>
+        {/* Section Sécurité */}
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            <Shield size={24} />
+            Sécurité
+          </h2>
+          <div style={styles.settingItem}>
+            <span style={styles.settingLabel}>Profil public</span>
+            <div style={styles.toggle}>
+              <div style={styles.toggleBall}></div>
+            </div>
+          </div>
+          <div style={styles.settingItem}>
+            <span style={styles.settingLabel}>Afficher mes statistiques</span>
+            <div style={styles.toggle}>
+              <div style={styles.toggleBall}></div>
+            </div>
+          </div>
+          <div style={{...styles.settingItem, borderBottom: 'none'}}>
+            <span style={styles.settingLabel}>Autoriser les messages privés</span>
+            <div style={styles.toggle}>
+              <div style={styles.toggleBall}></div>
+            </div>
+          </div>
+        </div>
 
-          <SettingsCard title="Confidentialité">
-            <SettingToggle label="Profil public" />
-            <SettingToggle label="Afficher mes statistiques" />
-            <SettingToggle label="Autoriser les messages privés" />
-          </SettingsCard>
-
-          <SettingsCard title="Compte">
-            <button style={primaryButton}>
+        {/* Section Compte */}
+        <div style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            <Lock size={24} />
+            Compte
+          </h2>
+          
+          {/* Bouton Changer le mot de passe */}
+          <div style={styles.settingItem}>
+            <span style={styles.settingLabel}>Mot de passe</span>
+            <button
+              style={styles.button}
+              onClick={() => setShowPasswordModal(true)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0085C7';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#0085C7';
+              }}
+            >
               Changer le mot de passe
             </button>
+          </div>
 
-            <button style={dangerButton}>
-              Supprimer mon compte
+          <div style={{...styles.settingItem, borderBottom: 'none'}}>
+            <span style={styles.settingLabel}>Supprimer mon compte</span>
+            <button
+              style={styles.dangerButton}
+              onClick={() => {
+                if (window.confirm('Êtes-vous sûr de vouloir supprimer votre compte ?')) {
+                  // Logique de suppression
+                  console.log('Suppression du compte');
+                }
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#dc2626';
+                e.currentTarget.style.color = 'white';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#dc2626';
+              }}
+            >
+              Supprimer
             </button>
-          </SettingsCard>
+          </div>
         </div>
       </div>
-    </main>
-  );
-};
 
-/* ================= COMPOSANTS ================= */
-
-const SettingsCard = ({ title, children }) => (
-  <section style={cardStyle}>
-    <h3 style={cardTitle}>{title}</h3>
-    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-      {children}
-    </div>
-  </section>
-);
-
-const SettingToggle = ({ label }) => {
-  const [enabled, setEnabled] = useState(true);
-
-  return (
-    <div style={toggleRow}>
-      <span>{label}</span>
-
-      <button
-        onClick={() => setEnabled(!enabled)}
-        style={{
-          ...toggleButton,
-          backgroundColor: enabled ? colors.green : "#d1d5db",
-        }}
-      >
-        <div
-          style={{
-            ...toggleKnob,
-            transform: enabled ? "translateX(24px)" : "translateX(0)",
-          }}
-        />
-      </button>
+      {/* Modal de changement de mot de passe */}
+      <ResetPasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        mode="change"
+      />
     </div>
   );
-};
-
-/* ================= STYLES ================= */
-
-const pageStyle = {
-  minHeight: "calc(100vh - 80px)",
-  backgroundColor: colors.grayBg,
-  padding: "40px 20px",
-  fontFamily: "Arial, sans-serif",
-};
-
-const containerStyle = {
-  maxWidth: "1000px",
-  margin: "0 auto",
-};
-
-const headerStyle = {
-  background: "linear-gradient(135deg, #0085C7 0%, #009F3D 100%)",
-  borderRadius: "15px",
-  padding: "40px",
-  marginBottom: "30px",
-  color: "white",
-  boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-};
-
-const titleStyle = {
-  fontSize: "36px",
-  fontWeight: "bold",
-  marginBottom: "10px",
-};
-
-const subtitleStyle = {
-  fontSize: "14px",
-  opacity: 0.9,
-};
-
-const sectionsWrapper = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "24px",
-};
-
-const cardStyle = {
-  backgroundColor: "white",
-  borderRadius: "15px",
-  padding: "24px",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-};
-
-const cardTitle = {
-  fontSize: "20px",
-  fontWeight: "bold",
-  marginBottom: "16px",
-};
-
-const toggleRow = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
-
-const toggleButton = {
-  width: "52px",
-  height: "26px",
-  borderRadius: "999px",
-  border: "none",
-  cursor: "pointer",
-  padding: "3px",
-  transition: "background-color 0.2s",
-};
-
-const toggleKnob = {
-  width: "20px",
-  height: "20px",
-  borderRadius: "50%",
-  backgroundColor: "white",
-  transition: "transform 0.2s",
-};
-
-const primaryButton = {
-  width: "100%",
-  padding: "14px",
-  borderRadius: "10px",
-  border: `2px solid ${colors.blue}`,
-  backgroundColor: "transparent",
-  color: colors.blue,
-  fontWeight: "600",
-  cursor: "pointer",
-};
-
-const dangerButton = {
-  width: "100%",
-  padding: "14px",
-  borderRadius: "10px",
-  border: `2px solid ${colors.danger}`,
-  backgroundColor: "transparent",
-  color: colors.danger,
-  fontWeight: "600",
-  cursor: "pointer",
-};
-
-export default SettingsPage;
+}

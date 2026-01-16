@@ -179,22 +179,22 @@ export function CreateArticlePage() {
   const moveBlock = (index, direction) => {
     const newBlocks = [...blocks];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    
+
     if (targetIndex < 0 || targetIndex >= newBlocks.length) return;
-    
+
     [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
-    
+
     // Réorganiser les orderIndex
     newBlocks.forEach((block, idx) => {
       block.orderIndex = idx;
     });
-    
+
     setBlocks(newBlocks);
   };
 
   // Mettre à jour le contenu d'un block
   const updateBlockContent = (id, content) => {
-    setBlocks(blocks.map(block => 
+    setBlocks(blocks.map(block =>
       block.id === id ? { ...block, content } : block
     ));
   };
@@ -225,35 +225,67 @@ export function CreateArticlePage() {
 
     setIsSubmitting(true);
 
+    console.log('envoie...');
+
+
     try {
+      // Générer le contenu à partir des blocks
+      const generatedContent = blocks
+        .map(block => {
+          if (block.type === 'text') {
+            return block.content.text;
+          } else if (block.type === 'image') {
+            return `[Image: ${block.content.url}]`;
+          } else if (block.type === 'visualization') {
+            return '[Visualisation]';
+          }
+          return '';
+        })
+        .filter(text => text?.trim())
+        .join('\n\n');
+
+      console.log('📤 Envoi de l\'article:', {
+        title,
+        content: generatedContent,
+        blocks: blocks.length
+      });
+
       const response = await fetch('http://localhost:8000/api/articles', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/ld+json',
+          'Accept': 'application/ld+json',
           'Authorization': `Bearer ${getToken()}`
         },
         body: JSON.stringify({
           title: title,
-          blocks: blocks.map(block => ({
-            type: block.type,
-            orderIndex: block.orderIndex,
-            content: block.content
-          }))
+          content: generatedContent,
+          blocks: [...blocks]
+            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .map(block => ({
+              type: block.type,
+              orderIndex: block.orderIndex,
+              content: block.content
+            }))
         })
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Erreur lors de la création');
+        console.error('Erreur API:', error);
+        throw new Error(error.detail || error.message || 'Erreur lors de la création');
       }
 
       const data = await response.json();
+      console.log('✅ Article créé:', data);
       alert('Article créé avec succès !');
       navigate(`/actualites/${data.id}`);
 
     } catch (error) {
       console.error('Erreur:', error);
-      alert(error.message);
+      alert('❌ ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -338,15 +370,64 @@ export function CreateArticlePage() {
               )}
 
               {block.type === 'image' && (
-                <input
-                  type="text"
-                  placeholder="URL de l'image..."
-                  value={block.content.url || ''}
-                  onChange={(e) => updateBlockContent(block.id, { url: e.target.value })}
-                  style={styles.input}
-                  onFocus={(e) => e.target.style.borderColor = '#0085C7'}
-                  onBlur={(e) => e.target.style.borderColor = '#D9D9D9'}
-                />
+                <div>
+                  <div style={{ marginBottom: '15px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                      Importer une image
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            updateBlockContent(block.id, { url: event.target.result });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      style={{
+                        padding: '10px',
+                        border: '2px dashed #0085C7',
+                        borderRadius: '10px',
+                        backgroundColor: '#f0f8ff',
+                        cursor: 'pointer',
+                        width: '100%',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '15px', textAlign: 'center', color: '#999', fontSize: '14px' }}>
+                    OU
+                  </div>
+
+                  <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                    Coller l'URL de l'image
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://exemple.com/image.jpg"
+                    value={block.content.url || ''}
+                    onChange={(e) => updateBlockContent(block.id, { url: e.target.value })}
+                    style={styles.input}
+                    onFocus={(e) => e.target.style.borderColor = '#0085C7'}
+                    onBlur={(e) => e.target.style.borderColor = '#D9D9D9'}
+                  />
+
+                  {block.content.url && (
+                    <div style={{ marginTop: '15px', textAlign: 'center' }}>
+                      <img
+                        src={block.content.url}
+                        alt="Aperçu"
+                        style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    </div>
+                  )}
+                </div>
               )}
 
               {block.type === 'visualization' && (

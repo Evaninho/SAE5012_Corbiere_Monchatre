@@ -3,6 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import logoImage from "../image/LOGO_OFFI.png";
 
+import { ResetPasswordModal } from '../commun/PasswordResetModal';
+
+
 export function LoginForm() {
     const navigate = useNavigate();
 
@@ -12,12 +15,17 @@ export function LoginForm() {
         rememberMe: false,
     });
 
+
+
+
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [resetEmail, setResetEmail] = useState("");
     const [resetSent, setResetSent] = useState(false);
+    const [showResetModal, setShowResetModal] = useState(false);
+
 
     const API_BASE_URL = "http://localhost:8000/api";
 
@@ -283,14 +291,16 @@ export function LoginForm() {
             });
 
             console.log('status : ', response.status);
-            
+            console.log(response);
+
+
 
             if (!response.ok) {
                 throw new Error("Email ou mot de passe incorrect");
             }
 
             const data = await response.json();
-            // console.log("Réponse complète:", data);
+            console.log("Réponse complète:", data);
 
             // Stocker le token
             localStorage.setItem("authToken", data.token);
@@ -463,15 +473,28 @@ export function LoginForm() {
                             <span>Se souvenir de moi</span>
                         </label>
 
-                        <span
+                        {/* <span
                             style={forgotLinkStyle}
                             onClick={() => setShowForgotPassword(true)}
                             onMouseEnter={(e) => e.target.style.color = "#006ba3"}
                             onMouseLeave={(e) => e.target.style.color = "#0085C7"}
                         >
                             Mot de passe oublié ?
+                        </span> */}
+                        <span
+                            style={forgotLinkStyle}
+                            onClick={() => {
+                                setResetEmail(formData.email); // Pré-remplir avec l'email saisi
+                                setShowResetModal(true);
+                            }}
+                            onMouseEnter={(e) => e.target.style.color = "#006ba3"}
+                            onMouseLeave={(e) => e.target.style.color = "#0085C7"}
+                        >
+                            Mot de passe oublié ?
                         </span>
+
                     </div>
+
 
                     {/* Bouton connexion */}
                     <button
@@ -496,6 +519,12 @@ export function LoginForm() {
                         S'inscrire gratuitement
                     </Link>
                 </p>
+                <ResetPasswordModal
+                    isOpen={showResetModal}
+                    onClose={() => setShowResetModal(false)}
+                    mode="forgot"
+                    email={resetEmail}
+                />
             </div>
 
             {/* Modal Mot de passe oublié */}

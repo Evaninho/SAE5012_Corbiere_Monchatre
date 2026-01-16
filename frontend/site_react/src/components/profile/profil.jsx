@@ -8,6 +8,7 @@ export function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentRole, setCurrentRole] = useState('visitor');
 
   const [formData, setFormData] = useState({
     prenom: '',
@@ -18,7 +19,23 @@ export function ProfilePage() {
     sports: ''
   });
 
+  const paysList = ["Autre", "Afrique du Sud", "Algérie", "Allemagne", "Argentine", "Australie", "Autriche", "Belgique", "Brésil", "Canada", "Chine", "Corée du Sud", "Côte d'Ivoire", "Danemark", "Espagne", "États-Unis", "Finlande", "France", "Grèce", "Inde", "Irlande", "Italie", "Japon", "Luxembourg", "Maroc", "Mexique", "Norvège", "Nouvelle-Zélande", "Pays-Bas", "Portugal", "Royaume-Uni", "Russie", "Sénégal", "Suède", "Suisse", "Tunisie"];
+
+
   const API_BASE_URL = 'http://localhost:8000/api';
+
+  useEffect(() => {
+    // Récupérer le rôle actuel et les données de l'utilisateur
+    const userDataFromStorage = JSON.parse(localStorage.getItem('userData') || '{}');
+    setUserData(userDataFromStorage);
+
+    // Récupérer le rôle depuis le tableau roles
+    if (userDataFromStorage.roles && Array.isArray(userDataFromStorage.roles)) {
+      setCurrentRole(userDataFromStorage.roles[0] || 'visitor');
+    } else {
+      setCurrentRole('visitor');
+    }
+  }, []);
 
   // Styles
   const pageStyle = {
@@ -128,6 +145,19 @@ export function ProfilePage() {
     fontWeight: '600'
   };
 
+  const getRoleDisplayName = () => {
+    const roleMap = {
+      'ROLE_USER': { name: 'Utilisateur', color: '#6b7280' },
+      'ROLE_AUTHOR': { name: 'Auteur', color: '#0085C7' },
+      'ROLE_EDITOR': { name: 'Editeur', color: '#F4C300' },
+      'ROLE_DATA_PROVIDER': { name: 'Fournisseur de données', color: '#009F3D' },
+      'ROLE_ADMIN': { name: 'Administrateur', color: '#dc2626' }
+    };
+
+    const role = currentRole || 'ROLE_USER';
+    return roleMap[role] || { name: 'Utilisateur', color: '#0085C7' };
+  };
+
   // Charger le profil
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -143,7 +173,7 @@ export function ProfilePage() {
     try {
       setLoading(true);
       const storedData = localStorage.getItem('userData');
-      
+
       if (storedData) {
         const data = JSON.parse(storedData);
         setUserData(data);
@@ -173,39 +203,45 @@ export function ProfilePage() {
   const handleSave = async () => {
     const token = localStorage.getItem('authToken');
     const userID = localStorage.getItem('userId');
-    
+
     setIsSaving(true);
     console.log('lancement');
     console.log(userID);
-    
-    
+
+
 
     try {
-      const response = await fetch(`${API_BASE_URL}/user/${userID}`, {
-        method: 'PUT',
+      const response = await fetch(`${API_BASE_URL}/users/${userID}`, {
+        method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/merge-patch+json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(formData)
       });
-      console.log("statu : "+response.status);
-      
+      console.log("statu : " + response.status);
+
 
       if (!response.ok) {
         throw new Error('Erreur lors de la mise à jour');
       }
+      // if (!response.ok) {
+      //           const error = await response.json();
+      //           console.error("Erreur API:", error);
+      //           throw new Error(error['hydra:description'] || 'Erreur 400');
+      //       }
 
-      const data = await response.json();
-      
+      // const data = await response.json();
+      // console.log(data);
+
       // Mettre à jour localStorage
       const updatedUser = { ...userData, ...formData };
       localStorage.setItem('userData', JSON.stringify(updatedUser));
       setUserData(updatedUser);
-      
+
       // Déclencher un événement pour mettre à jour la navbar
       window.dispatchEvent(new Event('storage'));
-      
+
       setIsEditing(false);
       alert('Profil mis à jour avec succès !');
     } catch (error) {
@@ -230,14 +266,14 @@ export function ProfilePage() {
       creator: { text: 'Créateur', color: '#F4C300', icon: <Crown size={16} /> },
       publicity: { text: 'Publicité', color: '#dc2626', icon: <Crown size={16} /> }
     };
-    
+
     return badges[sub] || badges.free;
   };
 
   if (loading) {
     return (
       <div style={pageStyle}>
-        <div style={{...containerStyle, textAlign: 'center', paddingTop: '100px'}}>
+        <div style={{ ...containerStyle, textAlign: 'center', paddingTop: '100px' }}>
           Chargement du profil...
         </div>
       </div>
@@ -245,6 +281,7 @@ export function ProfilePage() {
   }
 
   const subscriptionBadge = getSubscriptionBadge();
+  const roleInfo = getRoleDisplayName();
 
   return (
     <div style={pageStyle}>
@@ -255,10 +292,13 @@ export function ProfilePage() {
           <h1 style={{ textAlign: 'center', fontSize: '32px', marginBottom: '10px' }}>
             {userData?.pseudo || userData?.prenom || 'Utilisateur'}
           </h1>
-          <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-            <span style={{...badgeStyle, backgroundColor: subscriptionBadge.color, color: 'white'}}>
+          <div style={{ textAlign: 'center', marginBottom: '10px', display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {/* <span style={{...badgeStyle, backgroundColor: subscriptionBadge.color, color: 'white'}}>
               {subscriptionBadge.icon}
               {subscriptionBadge.text}
+            </span> */}
+            <span style={{ ...badgeStyle, backgroundColor: roleInfo.color, color: 'white' }}>
+              {roleInfo.name}
             </span>
           </div>
           <p style={{ textAlign: 'center', fontSize: '14px', opacity: 0.9 }}>
@@ -267,7 +307,7 @@ export function ProfilePage() {
         </div>
 
         {/* Statistiques */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+        {/* <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
           <div style={statCardStyle}>
             <MessageSquare size={32} color="#0085C7" style={{ margin: '0 auto 10px' }} />
             <p style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '5px' }}>0</p>
@@ -288,7 +328,7 @@ export function ProfilePage() {
             <p style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '5px' }}>0</p>
             <p style={{ color: '#666', fontSize: '14px' }}>Articles</p>
           </div>
-        </div>
+        </div> */}
 
         {/* Informations du profil */}
         <div style={cardStyle}>
@@ -341,7 +381,7 @@ export function ProfilePage() {
                 value={formData.prenom}
                 onChange={handleChange}
                 disabled={!isEditing}
-                style={{...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb'}}
+                style={{ ...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb' }}
               />
             </div>
 
@@ -353,7 +393,7 @@ export function ProfilePage() {
                 value={formData.nom}
                 onChange={handleChange}
                 disabled={!isEditing}
-                style={{...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb'}}
+                style={{ ...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb' }}
               />
             </div>
 
@@ -365,7 +405,7 @@ export function ProfilePage() {
                 value={formData.pseudo}
                 onChange={handleChange}
                 disabled={!isEditing}
-                style={{...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb'}}
+                style={{ ...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb' }}
               />
             </div>
 
@@ -377,7 +417,7 @@ export function ProfilePage() {
                 value={formData.email}
                 onChange={handleChange}
                 disabled={true}
-                style={{...inputStyle, backgroundColor: '#f9fafb'}}
+                style={{ ...inputStyle, backgroundColor: '#f9fafb' }}
               />
             </div>
 
@@ -388,13 +428,11 @@ export function ProfilePage() {
                 value={formData.pays}
                 onChange={handleChange}
                 disabled={!isEditing}
-                style={{...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb'}}
+                style={{ ...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb' }}
               >
-                <option value="">Sélectionner</option>
-                <option value="France">France</option>
-                <option value="Belgique">Belgique</option>
-                <option value="Suisse">Suisse</option>
-                <option value="Canada">Canada</option>
+                {paysList.map(pays => (
+                  <option key={pays} value={pays}>{pays}</option>
+                ))}
               </select>
             </div>
 
@@ -403,11 +441,11 @@ export function ProfilePage() {
               <input
                 type="text"
                 name="sport_favoris"
-                value={formData.sport_favoris}
+                value={formData.sport_favoris ?? ''}
                 onChange={handleChange}
                 disabled={!isEditing}
                 placeholder="ex: Athlétisme"
-                style={{...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb'}}
+                style={{ ...inputStyle, backgroundColor: isEditing ? 'white' : '#f9fafb' }}
               />
             </div>
           </div>
