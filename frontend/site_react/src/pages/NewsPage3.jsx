@@ -94,7 +94,7 @@ export function NewsPage3() {
   ) || [];
 
   if (isLoading) {
-    return <p style={{ textAlign: 'center', padding: '40px' }}>Chargement...</p>;
+    return <p style={{ textAlign: 'center', padding: '40px', height: '100vh' }}>Chargement...</p>;
   }
 
   if (error) {

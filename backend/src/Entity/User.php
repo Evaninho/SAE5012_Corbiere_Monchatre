@@ -8,7 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Delete};
+use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Patch, Delete};
 use Symfony\Component\Serializer\Annotation\Groups;
 use App\State\UserPasswordHasherProcessor;
 
@@ -26,6 +26,10 @@ use App\State\UserPasswordHasherProcessor;
         new Put(
             security: "object == user or is_granted('ROLE_ADMIN')",
             processor: UserPasswordHasherProcessor::class
+        ),
+        new Patch(
+            security: "object == user or is_granted('ROLE_ADMIN')",
+            denormalizationContext: ['groups' => ['user:write']]
         ),
         new Delete(
             security: "is_granted('ROLE_ADMIN')"
@@ -60,7 +64,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $nom = null;
 
     #[ORM\Column(length: 50, nullable: true)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['user:read', 'user:write', 'rating:read', 'article:read'])]
     private ?string $pseudo = null;
 
     #[ORM\Column(length: 100, nullable: true)]

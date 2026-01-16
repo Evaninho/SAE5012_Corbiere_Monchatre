@@ -160,12 +160,14 @@ export function NewsDetailPage() {
       if (!response.ok) throw new Error('Article non trouvé');
 
       const data = await response.json();
+      console.log(data);
+
       setArticle(data);
       
-      const test = await fetch(`${API_BASE_URL}/ratings`);
-      const datatest = await test.json();
+      // const test = await fetch(`${API_BASE_URL}/ratings`);
+      // const datatest = await test.json();
 
-      console.log(datatest);
+      // console.log(datatest);
       
 
       const ratingsData = data.ratings || [];
@@ -328,7 +330,7 @@ export function NewsDetailPage() {
           {ratingsWithComments.map(rating => (
             <div key={rating.id} style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '15px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong>Utilisateur</strong>
+                <strong> {data.author?.pseudo ?? 'Utilisateur'}</strong>
                 <span style={{ fontSize: '12px', color: '#999' }}>
                   {new Date(rating.createdAt).toLocaleDateString('fr-FR')}
                 </span>

@@ -27,7 +27,7 @@ import { ProfilePage} from './components/profile/profil.jsx'
 import { SubscriptionPage} from './components/profile/subprofil.jsx'
 // import { SubscriptionPage} from './components/profile/subtest.jsx'
 
-import  SettingsPage from './components/profile/parametre.jsx'
+import  { SettingsPage } from './components/profile/parametre.jsx'
 
 
 

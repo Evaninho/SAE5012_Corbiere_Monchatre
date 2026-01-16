@@ -2,7 +2,7 @@
 
 export const ROLES = {
   VISITOR: 'visitor',           // Non connecté
-  USER: 'ROLE_USER',            // Abonné (gratuit)
+  USER: 'ROLE_USER',            // Utilisateur (gratuit)
   AUTHOR: 'ROLE_AUTHOR',        // Auteur (payant)
   EDITOR: 'ROLE_EDITOR',        // Éditeur (payant)
   DATA_PROVIDER: 'ROLE_DATA_PROVIDER', // Fournisseur (payant)
@@ -61,7 +61,7 @@ export const PERMISSIONS = {
     canImportData: false,
     canManageUsers: false,
     
-    displayName: 'Abonné',
+    displayName: 'Utilisateur',
     color: '#3B82F6',
     icon: '👤',
     isPaid: false,
@@ -87,10 +87,17 @@ export const PERMISSIONS = {
     canManageUsers: false,
     
     displayName: 'Auteur',
-    color: '#8B5CF6',
-    icon: '✍️',
+    color: '#0085C7',
     isPaid: true,
-    price: '4,99 €/mois'
+    price: 4.99,
+    popular: false,
+    features: [
+      'Certification associée',
+      'Personnalisation avancée',
+      'Notifications en avant-première',
+      'Accès direct avant version gratuite',
+      'Avantages partenaires'
+    ]
   },
   
   ROLE_EDITOR: {
@@ -112,10 +119,16 @@ export const PERMISSIONS = {
     canManageUsers: false,
     
     displayName: 'Éditeur',
-    color: '#EC4899',
-    icon: '📝',
+    color: '#F4C300',
     isPaid: true,
-    price: '7,99 €/mois'
+    price: 5.99,
+    popular: true,
+    features: [
+      'Toutes les fonctionnalités Auteur',
+      'Droit de publier des articles validés',
+      'Certification premium',
+      'Badge exclusif créateur'
+    ]
   },
   
   ROLE_DATA_PROVIDER: {
@@ -126,9 +139,9 @@ export const PERMISSIONS = {
     canComment: true,
     canRate: true,
     canAddFavorites: true,
-    canCreateArticles: true,
-    canEditOwnArticles: true,
-    canEditAllArticles: true,
+    canCreateArticles: false,
+    canEditOwnArticles: false,
+    canEditAllArticles: false,
     
     // Nouvelles permissions
     canImportData: true,
@@ -138,10 +151,16 @@ export const PERMISSIONS = {
     canManageUsers: false,
     
     displayName: 'Fournisseur de Données',
-    color: '#10B981',
-    icon: '📊',
+    color: '#009F3D',
     isPaid: true,
-    price: '9,99 €/mois'
+    price: 9.99,
+    popular: false,
+    features: [
+      'Possibilité de booster 3 articles/mois',
+      'Statistiques avancées',
+      'Badge exclusif premium',
+      'Support prioritaire'
+    ]
   },
   
   ROLE_ADMIN: {

@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Crown, Zap, TrendingUp } from 'lucide-react';
+import { PERMISSIONS } from '../../utils/roles';
 
 export function SubscriptionPage() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
-  const [currentPlan, setCurrentPlan] = useState('free');
+  const [currentRole, setCurrentRole] = useState('ROLE_USER');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const API_BASE_URL = 'http://localhost:8000/api';
+
+  // Icones pour les plans
+  const iconMap = {
+    'ROLE_AUTHOR': <Zap size={32} />,
+    'ROLE_EDITOR': <Crown size={32} />,
+    'ROLE_DATA_PROVIDER': <TrendingUp size={32} />
+  };
+
+  // Récupérer les plans depuis PERMISSIONS
+  const plans = [
+    { id: 'ROLE_AUTHOR', ...PERMISSIONS.ROLE_AUTHOR },
+    { id: 'ROLE_EDITOR', ...PERMISSIONS.ROLE_EDITOR },
+    { id: 'ROLE_DATA_PROVIDER', ...PERMISSIONS.ROLE_DATA_PROVIDER }
+  ];
 
   useEffect(() => {
     const token = localStorage.getItem('authToken');
@@ -18,54 +36,11 @@ export function SubscriptionPage() {
     if (storedData) {
       const data = JSON.parse(storedData);
       setUserData(data);
-      setCurrentPlan(data.subscription_type || 'free');
+      if (data.roles && Array.isArray(data.roles)) {
+        setCurrentRole(data.roles[0] || 'ROLE_USER');
+      }
     }
   }, [navigate]);
-
-  const plans = [
-    {
-      id: 'plus',
-      name: 'Plus',
-      price: 2.99,
-      color: '#0085C7',
-      icon: <Zap size={32} />,
-      features: [
-        'Certification associée',
-        'Personnalisation avancée',
-        'Notifications en avant-première',
-        'Accès direct avant version gratuite',
-        'Avantages partenaires'
-      ]
-    },
-    {
-      id: 'creator',
-      name: 'Créateur',
-      price: 5.99,
-      color: '#F4C300',
-      icon: <Crown size={32} />,
-      popular: true,
-      features: [
-        'Toutes les fonctionnalités Plus',
-        'Droit de publier des articles validés',
-        'Certification premium',
-        'Badge exclusif créateur'
-      ]
-    },
-    {
-      id: 'publicity',
-      name: 'Publicité',
-      price: 9.99,
-      color: '#dc2626',
-      icon: <TrendingUp size={32} />,
-      features: [
-        'Toutes les fonctionnalités Créateur',
-        'Possibilité de booster 3 articles/mois',
-        'Statistiques avancées',
-        'Badge exclusif publicité',
-        'Support prioritaire'
-      ]
-    }
-  ];
 
   const styles = {
     page: {
@@ -192,11 +167,55 @@ export function SubscriptionPage() {
     }
   };
 
-  const handleSubscribe = (planId) => {
-    if (planId === currentPlan) return;
+  const handleSubscribe = async (planId) => {
+    const token = localStorage.getItem('authToken');
     
-    // Ici vous appelleriez votre API pour gérer l'abonnement
-    alert(`Souscription à ${planId} - Fonctionnalité à implémenter avec votre système de paiement`);
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    if (planId === currentRole) return;
+
+    if (!window.confirm(`Voulez-vous vraiment souscrire au plan ${planId.replace('ROLE_', '')} ?`)) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const roleMap = {
+        'ROLE_AUTHOR': 'auteur',
+        'ROLE_EDITOR': 'editeur',
+        'ROLE_DATA_PROVIDER': 'fournisseur'
+      };
+
+      const response = await fetch(`${API_BASE_URL}/role/${roleMap[planId]}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de la mise à jour du rôle');
+      }
+
+      const data = await response.json();
+      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+      userData.roles = data.roles;
+      localStorage.setItem('userData', JSON.stringify(userData));
+      setCurrentRole(planId);
+      setUserData(userData);
+
+      alert(`✅ Abonnement activé avec succès !`);
+      setTimeout(() => navigate('/profile'), 1000);
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert('❌ Erreur lors de la mise à jour');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -207,9 +226,9 @@ export function SubscriptionPage() {
           <p style={styles.subtitle}>
             Débloquez des fonctionnalités exclusives et soutenez la plateforme
           </p>
-          {currentPlan !== 'free' && (
+          {currentRole !== 'ROLE_USER' && (
             <div style={{...styles.currentBadge, marginTop: '20px'}}>
-              ✓ Vous êtes actuellement abonné au plan {currentPlan.toUpperCase()}
+              ✓ Vous êtes actuellement abonné au plan {plans.find(p => p.id === currentRole)?.displayName || 'Premium'}
             </div>
           )}
         </div>
@@ -235,10 +254,10 @@ export function SubscriptionPage() {
               {plan.popular && <div style={styles.popular}>POPULAIRE</div>}
               
               <div style={styles.iconContainer(plan.color)}>
-                {plan.icon}
+                {iconMap[plan.id]}
               </div>
 
-              <h3 style={styles.planName}>{plan.name}</h3>
+              <h3 style={styles.planName}>{plan.displayName}</h3>
               
               <div style={styles.price}>
                 {plan.price}€
@@ -255,21 +274,21 @@ export function SubscriptionPage() {
               </ul>
 
               <button
-                style={styles.button(plan.color, currentPlan === plan.id)}
+                style={styles.button(plan.color, currentRole === plan.id || isProcessing)}
                 onClick={() => handleSubscribe(plan.id)}
-                disabled={currentPlan === plan.id}
+                disabled={currentRole === plan.id || isProcessing}
                 onMouseEnter={(e) => {
-                  if (currentPlan !== plan.id) {
+                  if (currentRole !== plan.id && !isProcessing) {
                     e.currentTarget.style.opacity = '0.9';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (currentPlan !== plan.id) {
+                  if (currentRole !== plan.id && !isProcessing) {
                     e.currentTarget.style.opacity = '1';
                   }
                 }}
               >
-                {currentPlan === plan.id ? 'Abonnement actuel' : `Choisir ${plan.name}`}
+                {currentRole === plan.id ? 'Abonnement actuel' : isProcessing ? 'Traitement...' : `Choisir ${plan.displayName}`}
               </button>
             </div>
           ))}
@@ -286,9 +305,9 @@ export function SubscriptionPage() {
                 <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
                   <th style={{ textAlign: 'left', padding: '15px', fontWeight: 'bold' }}>Fonctionnalité</th>
                   <th style={{ textAlign: 'center', padding: '15px', fontWeight: 'bold' }}>Gratuit</th>
-                  <th style={{ textAlign: 'center', padding: '15px', fontWeight: 'bold', color: '#0085C7' }}>Plus</th>
-                  <th style={{ textAlign: 'center', padding: '15px', fontWeight: 'bold', color: '#F4C300' }}>Créateur</th>
-                  <th style={{ textAlign: 'center', padding: '15px', fontWeight: 'bold', color: '#dc2626' }}>Publicité</th>
+                  <th style={{ textAlign: 'center', padding: '15px', fontWeight: 'bold', color: '#0085C7' }}>Auteur</th>
+                  <th style={{ textAlign: 'center', padding: '15px', fontWeight: 'bold', color: '#F4C300' }}>Editeur</th>
+                  <th style={{ textAlign: 'center', padding: '15px', fontWeight: 'bold', color: '#009F3D' }}>Fournisseur de données</th>
                 </tr>
               </thead>
               <tbody>
@@ -298,7 +317,7 @@ export function SubscriptionPage() {
                   { feature: 'Commentaires', free: true, plus: true, creator: true, pub: true },
                   { feature: 'Certification', free: false, plus: true, creator: true, pub: true },
                   { feature: 'Personnalisation avancée', free: false, plus: true, creator: true, pub: true },
-                  { feature: 'Publication d\'articles', free: false, plus: false, creator: true, pub: true },
+                  { feature: 'Publication d\'articles', free: false, plus: true, creator: true, pub: false },
                   { feature: 'Boost d\'articles', free: false, plus: false, creator: false, pub: '3/mois' }
                 ].map((row, index) => (
                   <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>

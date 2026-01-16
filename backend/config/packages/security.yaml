@@ -28,12 +28,21 @@ security:
             stateless: true
             provider: app_user_provider
             jwt: ~
+        
+        main:
+            lazy: true
+            provider: app_user_provider
 
     access_control:
         - { path: ^/api/login_check, roles: PUBLIC_ACCESS }
         - { path: ^/api/docs, roles: PUBLIC_ACCESS }
         - { path: ^/api/me, roles: IS_AUTHENTICATED_FULLY }
-        #  - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/auth/register, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/reset-password, roles: PUBLIC_ACCESS }
+        # - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+
+        # - { path: ^/api/articles$, roles: PUBLIC_ACCESS, methods: [GET] }
+        # - { path: ^/api/articles, roles: ROLE_AUTHOR, methods: [POST, PUT, PATCH, DELETE] }
         # - { path: ^/api/articles, roles: PUBLIC_ACCESS, methods: [GET] }
         # - { path: ^/api/block, roles: PUBLIC_ACCESS, methods: [GET] }
         # - { path: ^/api/block, roles: PUBLIC_ACCESS, methods: [GET] }
