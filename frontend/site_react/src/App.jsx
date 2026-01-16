@@ -11,7 +11,7 @@ import { RegisterForm } from './components/auth/RegisterForm.jsx'
 // ---------------- page ----------------
 // Remplacement des imports pour correspondre aux fichiers/pages exportés
 import { HomePage } from './pages/HomePage.jsx'
-import { StatsPage } from './pages/StatsPage.jsx'
+import  StatsPage  from './pages/StatsPage.jsx'
 import { NewsPage } from './pages/NewsPage.jsx'
 import { NewsPage2 } from './pages/NewsPage2.jsx'
 import { NewsPage3 } from './pages/NewsPage3.jsx'
