@@ -17,15 +17,26 @@ class ArticleProcessor implements ProcessorInterface
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
-        // Assigner l'utilisateur actuel comme auteur si c'est une création (POST)
-        if ($data instanceof Article && $operation->getMethod() === 'POST') {
-            $user = $this->security->getUser();
-            if ($user) {
+        if (!$data instanceof Article) {
+            return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        }
+
+        if ($operation->getMethod() === 'POST') {
+
+            // Auteur
+            if ($user = $this->security->getUser()) {
                 $data->setAuthor($user);
+            }
+            dump($data->getBlocks());
+
+            // 🔥 FORÇAGE DU LIEN ARTICLE → BLOCKS
+            foreach ($data->getBlocks() as $block) {
+                if ($block->getArticle() !== $data) {
+                    $block->setArticle($data);
+                }
             }
         }
 
-        // Déléguer au processeur standard de persistence
         return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
     }
 }

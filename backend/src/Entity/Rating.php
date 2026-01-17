@@ -45,7 +45,7 @@ class Rating
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'ratings')]
-    #[Groups(['rating:read'])]
+    #[Groups(['rating:read', 'article:read'])]
 
     private ?User $user = null;
 

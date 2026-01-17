@@ -45,6 +45,8 @@ export function NewsPage3() {
     }
 
     const data = await response.json();
+    console.log(data);
+    
     return data.member;
   };
 

@@ -28,6 +28,8 @@ class MeController extends AbstractController
             'nom' => $user->getNom(),
             'pays' => $user->getPays(),
             'roles' => $user->getRoles(),
+            'sportFavoris' => $user->getsportFavoris(),
+            
         ]);
     }
 }

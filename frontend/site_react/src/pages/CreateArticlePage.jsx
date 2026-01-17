@@ -235,10 +235,8 @@ export function CreateArticlePage() {
           if (block.type === 'text') {
             return block.content.text;
           } else if (block.type === 'image') {
-            return `[Image: ${block.content.url}]`;
-          } else if (block.type === 'visualization') {
-            return '[Visualisation]';
-          }
+            return `{url: ${block.content.url}}`;
+          } 
           return '';
         })
         .filter(text => text?.trim())
@@ -479,7 +477,7 @@ export function CreateArticlePage() {
               Image
             </button>
 
-            <button
+            {/* <button
               onClick={() => addBlock('visualization')}
               style={{
                 ...styles.addBlockButton,
@@ -491,7 +489,7 @@ export function CreateArticlePage() {
             >
               <BarChart size={18} />
               Visualisation
-            </button>
+            </button> */}
           </div>
         </div>
 

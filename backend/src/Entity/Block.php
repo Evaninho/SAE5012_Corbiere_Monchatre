@@ -33,16 +33,16 @@ class Block
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['block:read', 'block:write', 'article:read'])]
+    #[Groups(['block:read', 'block:write', 'article:read', 'article:write'])]
     private ?string $type = null;
 
     #[ORM\Column]
-    #[Groups(['block:read', 'block:write', 'article:read'])]
+    #[Groups(['block:read', 'block:write', 'article:read', 'article:write'])]
 
     private array $content = [];
 
     #[ORM\Column(nullable: false)]
-    #[Groups(['block:read', 'block:write', 'article:read'])]
+    #[Groups(['block:read', 'block:write', 'article:read', 'article:write'])]
 
     private ?int $orderIndex = 0;
 
@@ -100,7 +100,7 @@ class Block
         return $this->article;
     }
 
-    public function setArticle(?Article $article): static
+    public function setArticle(?Article $article): self
     {
         $this->article = $article;
 

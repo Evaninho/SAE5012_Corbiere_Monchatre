@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import logoImage from "../image/LOGO_OFFI.png";
@@ -290,8 +290,8 @@ export function LoginForm() {
                 }),
             });
 
-            console.log('status : ', response.status);
-            console.log(response);
+            // console.log('status : ', response.status);
+            // console.log(response);
 
 
 
@@ -300,7 +300,7 @@ export function LoginForm() {
             }
 
             const data = await response.json();
-            console.log("Réponse complète:", data);
+            // console.log("Réponse complète:", data);
 
             // Stocker le token
             localStorage.setItem("authToken", data.token);
@@ -321,6 +321,8 @@ export function LoginForm() {
             }
 
             const userData = await meResponse.json();
+            // console.log(userData);
+            
 
             // Stocker les infos utilisateur
             localStorage.setItem("userData", JSON.stringify(userData));

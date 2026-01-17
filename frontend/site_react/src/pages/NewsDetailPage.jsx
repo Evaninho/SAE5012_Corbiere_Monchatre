@@ -163,12 +163,12 @@ export function NewsDetailPage() {
       console.log(data);
 
       setArticle(data);
-      
+
       // const test = await fetch(`${API_BASE_URL}/ratings`);
       // const datatest = await test.json();
 
       // console.log(datatest);
-      
+
 
       const ratingsData = data.ratings || [];
       setRatings(ratingsData);
@@ -199,26 +199,33 @@ export function NewsDetailPage() {
   // ========== AJOUT COMMENTAIRE + NOTE ==========
   const handleAddComment = async (e) => {
     e.preventDefault();
-    
+
     if (!newComment.trim() && newStars === 0) return;
 
     setIsSubmitting(true);
     console.log(newComment, ' ', newStars);
-    
+
 
     try {
-      await fetch(`${API_BASE_URL}/ratings`, {
+      const response = await fetch(`${API_BASE_URL}/ratings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/ld+json',
+          'Accept': 'application/ld+json',
           Authorization: `Bearer ${getToken()}`
         },
         body: JSON.stringify({
-          comment: newComment,
           stars: newStars,
+          comment: newComment,
           article: `/api/articles/${id}`
         })
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Erreur API:', error);
+        throw new Error(error.detail || 'Erreur lors de la création du commentaire');
+      }
       console.log('Commentaire envoyé avec succès');
 
       setNewComment("");
@@ -235,11 +242,11 @@ export function NewsDetailPage() {
   };
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', textAlign: 'center', padding: '100px', fontSize:'20px' }}>Chargement...</div>;
+    return <div style={{ minHeight: '100vh', textAlign: 'center', padding: '100px', fontSize: '20px' }}>Chargement...</div>;
   }
 
   if (error || !article) {
-    return <div style={{minHeight: '100vh', textAlign: 'center', padding: '100px', fontSize:'20px' }}>Article introuvable</div>;
+    return <div style={{ minHeight: '100vh', textAlign: 'center', padding: '100px', fontSize: '20px' }}>Article introuvable</div>;
   }
 
   const sortedBlocks = [...article.blocks].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -266,7 +273,7 @@ export function NewsDetailPage() {
           <div style={styles.actionsBar}>
             {/* 📅 date article */}
             <p style={{ fontSize: '13px', color: '#999', marginBottom: '15px' }}>
-              Publié le {new Date(article.createdAt).toLocaleDateString('fr-FR')}
+              Publié le {new Date(article.createdAt).toLocaleDateString('fr-FR')} par {article.author?.pseudo || 'Auteur'}
             </p>
 
             {/* NOTE MOYENNE */}
@@ -330,7 +337,7 @@ export function NewsDetailPage() {
           {ratingsWithComments.map(rating => (
             <div key={rating.id} style={{ background: '#f9f9f9', padding: '15px', borderRadius: '10px', marginBottom: '15px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong> {data.author?.pseudo ?? 'Utilisateur'}</strong>
+                <strong> {rating.user?.pseudo ?? 'Utilisateur'}</strong>
                 <span style={{ fontSize: '12px', color: '#999' }}>
                   {new Date(rating.createdAt).toLocaleDateString('fr-FR')}
                 </span>

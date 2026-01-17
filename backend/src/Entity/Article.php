@@ -73,8 +73,8 @@ class Article
     /**
      * @var Collection<int, Block>
      */
-    #[ORM\OneToMany(targetEntity: Block::class, mappedBy: 'article')]
-    #[Groups(['article:read'])]
+    #[ORM\OneToMany( mappedBy: 'article', targetEntity: Block::class, cascade: ['persist'], orphanRemoval: true )]
+    #[Groups(['article:read', 'article:write'])]
 
     private Collection $blocks;
 
@@ -82,7 +82,7 @@ class Article
      * @var Collection<int, Rating>
      */
     #[ORM\OneToMany(targetEntity: Rating::class, mappedBy: 'article')]
-    #[Groups(['article:read'])]
+    #[Groups(['article:read', 'article:write'])]
 
     private Collection $ratings;
 
@@ -165,7 +165,7 @@ class Article
         return $this->blocks;
     }
 
-    public function addBlock(Block $block): static
+    public function addBlock(Block $block): self
     {
         if (!$this->blocks->contains($block)) {
             $this->blocks->add($block);

@@ -16,7 +16,7 @@ export function ProfilePage() {
     pseudo: '',
     email: '',
     pays: '',
-    sports: ''
+    sportFavoris: ''
   });
 
   const paysList = ["Autre", "Afrique du Sud", "Algérie", "Allemagne", "Argentine", "Australie", "Autriche", "Belgique", "Brésil", "Canada", "Chine", "Corée du Sud", "Côte d'Ivoire", "Danemark", "Espagne", "États-Unis", "Finlande", "France", "Grèce", "Inde", "Irlande", "Italie", "Japon", "Luxembourg", "Maroc", "Mexique", "Norvège", "Nouvelle-Zélande", "Pays-Bas", "Portugal", "Royaume-Uni", "Russie", "Sénégal", "Suède", "Suisse", "Tunisie"];
@@ -27,6 +27,7 @@ export function ProfilePage() {
   useEffect(() => {
     // Récupérer le rôle actuel et les données de l'utilisateur
     const userDataFromStorage = JSON.parse(localStorage.getItem('userData') || '{}');
+    
     setUserData(userDataFromStorage);
 
     // Récupérer le rôle depuis le tableau roles
@@ -173,6 +174,8 @@ export function ProfilePage() {
     try {
       setLoading(true);
       const storedData = localStorage.getItem('userData');
+    console.log(storedData);
+
 
       if (storedData) {
         const data = JSON.parse(storedData);
@@ -183,7 +186,7 @@ export function ProfilePage() {
           pseudo: data.pseudo || '',
           email: data.email || '',
           pays: data.pays || '',
-          sportFavoris: data.sports || ''
+          sportFavoris: data.sportFavoris || ''
         });
       }
     } catch (error) {
@@ -440,8 +443,8 @@ export function ProfilePage() {
               <label style={labelStyle}>Sport favori</label>
               <input
                 type="text"
-                name="sport_favoris"
-                value={formData.sport_favoris ?? ''}
+                name="sportFavoris"
+                value={formData.sportFavoris ?? ''}
                 onChange={handleChange}
                 disabled={!isEditing}
                 placeholder="ex: Athlétisme"
