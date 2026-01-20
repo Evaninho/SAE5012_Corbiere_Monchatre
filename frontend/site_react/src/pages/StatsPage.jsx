@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { Upload, BarChart3, TrendingUp, Plus, X, RefreshCw, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
+import { Popup } from '../components/Popup';
 
 // ============ CONSTANTES ============
 const API_BASE = 'http://localhost:8000/api';
@@ -35,6 +36,13 @@ export default function StatsPage() {
   const [csvData, setCsvData] = useState([]);
   const [csvHeaders, setCsvHeaders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [user] = useState({ role: 'ROLE_DATA_PROVIDER' });
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   // État des modales
   const [modals, setModals] = useState({
@@ -225,8 +233,13 @@ export default function StatsPage() {
       loadDatasetsFromDB();
       alert('✅ Dataset enregistré avec succès !');
     } catch (error) {
-      console.error('Erreur enregistrement:', error);
-      alert('❌ ' + error.message);
+      console.error('Erreur upload:', error);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de l\'upload du fichier'
+      });
     } finally {
       setLoading(false);
     }
@@ -273,7 +286,12 @@ export default function StatsPage() {
       alert('✅ Visualisation créée avec succès !');
     } catch (error) {
       console.error('Erreur création visualisation:', error);
-      alert('❌ ' + error.message);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de la création de la visualisation'
+      });
     } finally {
       setLoading(false);
     }
@@ -896,15 +914,42 @@ export default function StatsPage() {
     );
   };
 
-  // ========== RENDU FINAL ==========
-  return (
-    <div style={styles.container}>
-      <Header />
-      <DatasetsList />
-      <VisualizationsSection />
-      <RegisterModal />
-      <CreateVizModal />
-      <ViewVizModal />
-    </div>
-  );
+      {showViewVizModal && selectedViz && csvData.length > 0 && (
+        <div style={styles.modal} onClick={() => setShowViewVizModal(false)}>
+          <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>
+                {selectedViz.config.title || 'Visualisation'}
+              </h2>
+              <button onClick={() => setShowViewVizModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            {renderChart(selectedViz, csvData)}
+
+            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
+              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
+                <strong>Type:</strong> {selectedViz.chartType}
+              </p>
+              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
+                <strong>Variable X:</strong> {selectedViz.config.xAxis}
+              </p>
+              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
+                <strong>Variable Y:</strong> {selectedViz.config.yAxis}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
+  
 }

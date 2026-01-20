@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, use } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import logoImage from "../image/LOGO_OFFI.png";
-
+import { Popup } from '../Popup';
 import { ResetPasswordModal } from '../commun/PasswordResetModal';
 
 
@@ -25,6 +25,12 @@ export function LoginForm() {
     const [resetEmail, setResetEmail] = useState("");
     const [resetSent, setResetSent] = useState(false);
     const [showResetModal, setShowResetModal] = useState(false);
+    const [popup, setPopup] = useState({
+        isOpen: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
 
 
     const API_BASE_URL = "http://localhost:8000/api";
@@ -235,8 +241,13 @@ export function LoginForm() {
         // Vérifier si déjà connecté
         const token = localStorage.getItem("authToken");
         if (token) {
-            alert("Vous êtes déjà connecté !");
-            navigate("/");
+            setPopup({
+                isOpen: true,
+                type: 'info',
+                title: 'Déjà connecté',
+                message: 'Vous êtes déjà connecté !'
+            });
+            setTimeout(() => navigate("/"), 1500);
         }
     }, [navigate]);
 
@@ -290,8 +301,8 @@ export function LoginForm() {
                 }),
             });
 
-            console.log('status : ', response.status);
-            console.log(response);
+            // console.log('status : ', response.status);
+            // console.log(response);
 
 
 
@@ -300,7 +311,7 @@ export function LoginForm() {
             }
 
             const data = await response.json();
-            console.log("Réponse complète:", data);
+            // console.log("Réponse complète:", data);
 
             // Stocker le token
             localStorage.setItem("authToken", data.token);
@@ -321,6 +332,8 @@ export function LoginForm() {
             }
 
             const userData = await meResponse.json();
+            // console.log(userData);
+            
 
             // Stocker les infos utilisateur
             localStorage.setItem("userData", JSON.stringify(userData));
@@ -348,12 +361,22 @@ export function LoginForm() {
         e.preventDefault();
 
         if (!resetEmail.trim()) {
-            alert("Veuillez entrer votre adresse email");
+            setPopup({
+                isOpen: true,
+                type: 'error',
+                title: 'Erreur',
+                message: 'Veuillez entrer votre adresse email'
+            });
             return;
         }
 
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail)) {
-            alert("Email invalide");
+            setPopup({
+                isOpen: true,
+                type: 'error',
+                title: 'Erreur',
+                message: 'Email invalide'
+            });
             return;
         }
 
@@ -380,7 +403,12 @@ export function LoginForm() {
 
         } catch (error) {
             console.error("Erreur:", error);
-            alert(error.message || "Une erreur est survenue");
+            setPopup({
+                isOpen: true,
+                type: 'error',
+                title: 'Erreur',
+                message: error.message || "Une erreur est survenue"
+            });
         }
     };
 
@@ -609,6 +637,15 @@ export function LoginForm() {
                     </div>
                 </div>
             )}
+
+            {/* POPUP */}
+            <Popup
+                isOpen={popup.isOpen}
+                onClose={() => setPopup({ ...popup, isOpen: false })}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+            />
         </div>
     );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit2, Save, X, Crown, MessageSquare, Star, Trophy, Award } from 'lucide-react';
+import { Popup } from '../Popup';
 
 export function ProfilePage() {
   const navigate = useNavigate();
@@ -9,6 +10,12 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [currentRole, setCurrentRole] = useState('visitor');
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   const [formData, setFormData] = useState({
     prenom: '',
@@ -16,7 +23,7 @@ export function ProfilePage() {
     pseudo: '',
     email: '',
     pays: '',
-    sports: ''
+    sportFavoris: ''
   });
 
   const paysList = ["Autre", "Afrique du Sud", "Algérie", "Allemagne", "Argentine", "Australie", "Autriche", "Belgique", "Brésil", "Canada", "Chine", "Corée du Sud", "Côte d'Ivoire", "Danemark", "Espagne", "États-Unis", "Finlande", "France", "Grèce", "Inde", "Irlande", "Italie", "Japon", "Luxembourg", "Maroc", "Mexique", "Norvège", "Nouvelle-Zélande", "Pays-Bas", "Portugal", "Royaume-Uni", "Russie", "Sénégal", "Suède", "Suisse", "Tunisie"];
@@ -27,6 +34,7 @@ export function ProfilePage() {
   useEffect(() => {
     // Récupérer le rôle actuel et les données de l'utilisateur
     const userDataFromStorage = JSON.parse(localStorage.getItem('userData') || '{}');
+    
     setUserData(userDataFromStorage);
 
     // Récupérer le rôle depuis le tableau roles
@@ -173,6 +181,8 @@ export function ProfilePage() {
     try {
       setLoading(true);
       const storedData = localStorage.getItem('userData');
+    console.log(storedData);
+
 
       if (storedData) {
         const data = JSON.parse(storedData);
@@ -183,7 +193,7 @@ export function ProfilePage() {
           pseudo: data.pseudo || '',
           email: data.email || '',
           pays: data.pays || '',
-          sportFavoris: data.sports || ''
+          sportFavoris: data.sportFavoris || ''
         });
       }
     } catch (error) {
@@ -243,10 +253,20 @@ export function ProfilePage() {
       window.dispatchEvent(new Event('storage'));
 
       setIsEditing(false);
-      alert('Profil mis à jour avec succès !');
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Succès !',
+        message: 'Profil mis à jour avec succès !'
+      });
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la mise à jour du profil');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de la mise à jour du profil'
+      });
     } finally {
       setIsSaving(false);
     }
@@ -440,8 +460,8 @@ export function ProfilePage() {
               <label style={labelStyle}>Sport favori</label>
               <input
                 type="text"
-                name="sport_favoris"
-                value={formData.sport_favoris ?? ''}
+                name="sportFavoris"
+                value={formData.sportFavoris ?? ''}
                 onChange={handleChange}
                 disabled={!isEditing}
                 placeholder="ex: Athlétisme"
@@ -470,6 +490,15 @@ export function ProfilePage() {
           </div> */}
         </div>
       </div>
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
     </div>
   );
 }

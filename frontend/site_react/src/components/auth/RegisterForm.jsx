@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import logoImage from "../image/LOGO_OFFI.png";
+import { Popup } from '../Popup';
 
 export function RegisterForm() {
     const navigate = useNavigate();
@@ -26,6 +27,12 @@ export function RegisterForm() {
 
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [popup, setPopup] = useState({
+        isOpen: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
 
 
     const paysList = [ "Autre", "Afrique du Sud", "Algérie", "Allemagne", "Argentine", "Australie", "Autriche", "Belgique", "Brésil", "Canada", "Chine", "Corée du Sud", "Côte d'Ivoire", "Danemark", "Espagne", "États-Unis", "Finlande", "France", "Grèce", "Inde", "Irlande", "Italie", "Japon", "Luxembourg", "Maroc", "Mexique", "Norvège", "Nouvelle-Zélande", "Pays-Bas", "Portugal", "Royaume-Uni", "Russie", "Sénégal", "Suède", "Suisse", "Tunisie" ];
@@ -393,12 +400,22 @@ export function RegisterForm() {
             //     localStorage.setItem('userData', JSON.stringify(data.user));
             // }
 
-            alert('Inscription réussie ! Bienvenue ' + formData.prenom + ' !');
-            navigate('/');
+            setPopup({
+                isOpen: true,
+                type: 'success',
+                title: 'Bienvenue !',
+                message: 'Inscription réussie ! Bienvenue ' + formData.prenom + ' !'
+            });
+            setTimeout(() => navigate('/'), 1500);
 
         } catch (error) {
             console.error('Erreur inscription:', error);
-            alert(error.message || 'Une erreur est survenue');
+            setPopup({
+                isOpen: true,
+                type: 'error',
+                title: 'Erreur',
+                message: error.message || 'Une erreur est survenue'
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -659,6 +676,15 @@ export function RegisterForm() {
             <p>
                 Vous avez déjà un compte ? <Link to="/login" style={linkStyle}>Se connecter</Link>
             </p>
+
+            {/* POPUP */}
+            <Popup
+                isOpen={popup.isOpen}
+                onClose={() => setPopup({ ...popup, isOpen: false })}
+                type={popup.type}
+                title={popup.title}
+                message={popup.message}
+            />
         </div>
     );
 }

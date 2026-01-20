@@ -54,11 +54,14 @@ export const usePermissions = () => {
     setPermissions(getRolePermissions(role));
     setIsLoggedIn(isAuthenticated(role));
   };
+  
+  const userId = localStorage.getItem('userId');
 
   return {
     userRole,
     permissions,
     isLoggedIn,
+    userId,
     can,
     isAtLeast,
     refreshPermissions

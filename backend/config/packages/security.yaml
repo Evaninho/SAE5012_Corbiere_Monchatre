@@ -39,12 +39,10 @@ security:
         - { path: ^/api/me, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/api/auth/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/reset-password, roles: PUBLIC_ACCESS }
-        # - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
-
-        # - { path: ^/api/articles$, roles: PUBLIC_ACCESS, methods: [GET] }
-        # - { path: ^/api/articles, roles: ROLE_AUTHOR, methods: [POST, PUT, PATCH, DELETE] }
-        # - { path: ^/api/articles, roles: PUBLIC_ACCESS, methods: [GET] }
-        # - { path: ^/api/block, roles: PUBLIC_ACCESS, methods: [GET] }
-        # - { path: ^/api/block, roles: PUBLIC_ACCESS, methods: [GET] }
-        # - { path: ^/api/block, roles: PUBLIC_ACCESS, methods: [GET] }
-        # - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
+        # Articles
+        - { path: ^/api/articles$, roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: ^/api/articles, roles: [ROLE_AUTHOR, ROLE_EDITOR, ROLE_ADMIN], methods: [POST, PUT, PATCH, DELETE] }
+        - { path: ^/api/articles, roles: PUBLIC_ACCESS, methods: [GET] }
+        # Ratings
+        - { path: ^/api/ratings, roles: [ROLE_USER, ROLE_AUTHOR, ROLE_EDITOR, ROLE_ADMIN], methods: [POST] }
+        - { path: ^/api/ratings, roles: PUBLIC_ACCESS, methods: [GET] }

@@ -4,12 +4,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Crown, Zap, TrendingUp, Check, X } from 'lucide-react';
 import { getUserRole, PERMISSIONS, getCurrentUser } from '../../utils/roles';
+import { Popup } from '../Popup';
 
 export function SubscriptionPage() {
   const navigate = useNavigate();
   const [currentRole, setCurrentRole] = useState('visitor');
   const [userData, setUserData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -316,8 +323,13 @@ export function SubscriptionPage() {
     const token = localStorage.getItem('authToken');
 
     if (!token) {
-      alert('Vous devez être connecté pour souscrire');
-      navigate('/login');
+      setPopup({
+        isOpen: true,
+        type: 'info',
+        title: 'Authentification requise',
+        message: 'Vous devez être connecté pour souscrire'
+      });
+      setTimeout(() => navigate('/login'), 1500);
       return;
     }
 
@@ -361,16 +373,26 @@ export function SubscriptionPage() {
       // Mettre à jour l'état local
       setCurrentRole(planId);
 
-      alert(`✅ Vous êtes maintenant abonné au plan ${planId.toUpperCase()} !\n\nVos nouveaux avantages sont actifs immédiatement.`);
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Abonnement activé !',
+        message: `Vous êtes maintenant abonné au plan ${planId.toUpperCase()} ! Vos nouveaux avantages sont actifs immédiatement.`
+      });
 
       // Rediriger vers le profil après 1 seconde
       setTimeout(() => {
         navigate('/profil');
-      }, 1000);
+      }, 1500);
 
     } catch (error) {
       console.error('Erreur souscription:', error);
-      alert(`❌ Erreur: ${error.message}`);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: `Erreur: ${error.message}`
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -541,6 +563,15 @@ export function SubscriptionPage() {
           </table>
         </div>
       </div>
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
     </div>
   );
 }
