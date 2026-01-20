@@ -6,6 +6,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\Security;
+use Doctrine\ORM\EntityManagerInterface;
+use App\Entity\User;
 
 class MeController extends AbstractController
 {
@@ -32,4 +34,24 @@ class MeController extends AbstractController
             
         ]);
     }
+
+     #[Route('/api/me', name: 'api_me_delete', methods: ['DELETE'])]
+    public function deleteMe(
+        Security $security,
+        EntityManagerInterface $em
+    ): JsonResponse {
+        /** @var User|null $user */
+        $user = $security->getUser();
+
+        if (!$user) {
+            return new JsonResponse(['message' => 'Non authentifié'], 401);
+        }
+
+        // suppression du compte
+        $em->remove($user);
+        $em->flush();
+
+        return new JsonResponse(null, 204);
+    }
+    
 }

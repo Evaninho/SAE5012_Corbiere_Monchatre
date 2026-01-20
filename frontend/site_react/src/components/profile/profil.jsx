@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit2, Save, X, Crown, MessageSquare, Star, Trophy, Award } from 'lucide-react';
+import { Popup } from '../Popup';
 
 export function ProfilePage() {
   const navigate = useNavigate();
@@ -9,6 +10,12 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [currentRole, setCurrentRole] = useState('visitor');
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   const [formData, setFormData] = useState({
     prenom: '',
@@ -246,10 +253,20 @@ export function ProfilePage() {
       window.dispatchEvent(new Event('storage'));
 
       setIsEditing(false);
-      alert('Profil mis à jour avec succès !');
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Succès !',
+        message: 'Profil mis à jour avec succès !'
+      });
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la mise à jour du profil');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de la mise à jour du profil'
+      });
     } finally {
       setIsSaving(false);
     }
@@ -473,6 +490,15 @@ export function ProfilePage() {
           </div> */}
         </div>
       </div>
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
     </div>
   );
 }

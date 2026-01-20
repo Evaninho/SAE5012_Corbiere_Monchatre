@@ -29,7 +29,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
             security: "object.getAuthor() == user or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"
         ),
         new Delete(
-            security: "is_granted('ROLE_ADMIN')"
+            security: "is_granted('ROLE_AUTHOR') or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"
         )
     ],
     normalizationContext: ['groups' => ['article:read']],

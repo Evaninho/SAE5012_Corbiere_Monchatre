@@ -2,12 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Crown, Zap, TrendingUp } from 'lucide-react';
 import { PERMISSIONS } from '../../utils/roles';
+import { Popup } from '../Popup';
 
 export function SubscriptionPage() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
   const [currentRole, setCurrentRole] = useState('ROLE_USER');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -208,11 +215,21 @@ export function SubscriptionPage() {
       setCurrentRole(planId);
       setUserData(userData);
 
-      alert(`✅ Abonnement activé avec succès !`);
-      setTimeout(() => navigate('/profile'), 1000);
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Succès !',
+        message: 'Abonnement activé avec succès !'
+      });
+      setTimeout(() => navigate('/profile'), 1500);
     } catch (error) {
       console.error('Erreur:', error);
-      alert('❌ Erreur lors de la mise à jour');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de la mise à jour'
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -341,6 +358,15 @@ export function SubscriptionPage() {
           </div>
         </div>
       </div>
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
     </div>
   );
 }

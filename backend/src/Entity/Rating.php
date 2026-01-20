@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\RatingRepository;
+use App\State\RatingProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
@@ -13,6 +14,10 @@ use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Delete};
     operations: [
         new Get(),
         new GetCollection(),
+        // new Post(
+        //     security: "is_granted('IS_AUTHENTICATED_FULLY')",
+        //     processor: RatingProcessor::class
+        // ),
         new Post(security: "is_granted('ROLE_USER')"),
         new Delete(security: "is_granted('ROLE_ADMIN')")
     ],

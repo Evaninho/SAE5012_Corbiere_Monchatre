@@ -12,11 +12,12 @@ import { RegisterForm } from './components/auth/RegisterForm.jsx'
 // Remplacement des imports pour correspondre aux fichiers/pages exportés
 import { HomePage } from './pages/HomePage.jsx'
 import  StatsPage  from './pages/StatsPage.jsx'
-import { NewsPage } from './pages/NewsPage.jsx'
-import { NewsPage2 } from './pages/NewsPage2.jsx'
+// import { NewsPage2 } from './pages/NewsPage2.jsx'
 import { NewsPage3 } from './pages/NewsPage3.jsx'
 import { NewsDetailPage } from './pages/NewsDetailPage.jsx'
 import { CreateArticlePage } from './pages/CreateArticlePage.jsx'
+import { GestionArticlesPage } from './pages/GestionArticlePage.jsx'
+
 
 import { GameIntroPage } from './pages/GameIntroPage.jsx'
 import { ContactPage } from './pages/ContactPage.jsx'
@@ -60,6 +61,8 @@ function App() {
         {/* ----- article ----- */}
         <Route path="/articles/:id" element={<NewsDetailPage />} />
         <Route path="/create-article" element={<CreateArticlePage />} />
+        <Route path="/gestion-articles" element={<GestionArticlesPage />} />
+
 
       </Routes>
       <Footer />

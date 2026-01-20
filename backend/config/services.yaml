@@ -28,3 +28,7 @@ services:
             $passwordHasher: '@security.user_password_hasher'
             $persistProcessor: '@api_platform.doctrine.orm.state.persist_processor'
         tags: ['controller.service_arguments']
+    
+    App\State\RatingProcessor:
+        arguments:
+            $persistProcessor: '@api_platform.doctrine.orm.state.persist_processor'

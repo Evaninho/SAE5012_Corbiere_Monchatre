@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { ResetPasswordModal } from '../commun/PasswordResetModal';
 import { Lock, Bell, Shield } from 'lucide-react';
+import { useNavigate } from "react-router-dom";
+import { Popup } from '../Popup';
+
 
 export function SettingsPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -15,10 +18,15 @@ export function SettingsPage() {
   const [privateMessages, setPrivateMessages] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
 
-  const API_BASE_URL = 'http://localhost:8000/api';
-  const userID = localStorage.getItem('userID')
   const getToken = () => localStorage.getItem('authToken');
 
 
@@ -115,41 +123,48 @@ export function SettingsPage() {
     );
 
     if (!confirmDelete) return;
+    console.log('lancement');
 
-    console.log('début de la supression');
-    
+
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userID}`, {
+      const response = await fetch('http://localhost:8000/api/me', {
         method: 'DELETE',
         headers: {
-          'Content-Type': 'application/ld+json',
           Authorization: `Bearer ${getToken()}`
         }
       });
-      console.log('requete passe');
-      
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error("Erreur API:", error);
-        throw new Error(error['hydra:description'] || 'Erreur 400');
-      }
 
       // if (!response.ok) {
-      //   throw new Error('Erreur lors de la suppression du compte');
+      //   const error = await response.json();
+      //   console.error("Erreur API:", error);
+      //   throw new Error(error['hydra:description'] || 'Erreur 400');
       // }
 
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
+      if (!response.ok) {
+        throw new Error(`Erreur ${response.status}`);
+      }
 
-      alert('Compte supprimé avec succès');
-
-      window.location.href = '/';
+      // nettoyage
+      localStorage.clear();
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Supprimé !',
+        message: 'Votre compte a été supprimé avec succès.'
+      });
+      setTimeout(() => navigate('/'), 1500);
 
     } catch (error) {
       console.error(error);
-      alert('Une erreur est survenue lors de la suppression du compte.');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de la suppression du compte'
+      });
+      setIsSubmitting(false);
     }
   };
 
@@ -235,19 +250,16 @@ export function SettingsPage() {
           <div style={{ ...styles.settingItem, borderBottom: 'none' }} disabled={isSubmitting}>
             <span style={styles.settingLabel}>Supprimer mon compte</span>
             <button
-              style={styles.dangerButton}
-              onClick={() => { handleSupprimerCompte() }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#dc2626';
-                e.currentTarget.style.color = 'white';
+              style={{
+                ...styles.dangerButton,
+                opacity: isSubmitting ? 0.6 : 1,
+                transform: isSubmitting ? 'scale(0.95)' : 'scale(1)',
+                transition: 'all 0.2s ease'
               }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = '#dc2626';
-              }}
-              
+              disabled={isSubmitting}
+              onClick={handleSupprimerCompte}
             >
-              {isSubmitting ? 'Suppression...' : 'Supprimer mon compte'}
+              {isSubmitting ? 'Suppression en cours...' : 'Supprimer mon compte'}
             </button>
           </div>
         </div>
@@ -258,6 +270,15 @@ export function SettingsPage() {
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
         mode="change"
+      />
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
       />
     </div>
   );

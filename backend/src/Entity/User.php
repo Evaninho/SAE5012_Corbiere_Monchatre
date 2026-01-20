@@ -17,7 +17,7 @@ use App\State\UserPasswordHasherProcessor;
 #[ApiResource(
     operations: [
         new Get(
-            security: "is_granted('ROLE_USER')"
+            security: "object == user or is_granted('ROLE_ADMIN')"
         ),
         new GetCollection(
             security: "is_granted('ROLE_ADMIN')"
@@ -32,7 +32,7 @@ use App\State\UserPasswordHasherProcessor;
             denormalizationContext: ['groups' => ['user:write']]
         ),
         new Delete(
-            security: "object == user or is_granted('ROLE_ADMIN')"
+             securityPostDenormalize: "object == user or is_granted('ROLE_ADMIN')"
         )
     ],
     normalizationContext: ['groups' => ['user:read']],

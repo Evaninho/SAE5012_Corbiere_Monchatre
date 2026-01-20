@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, PieChart, Pie, LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer } from 'recharts';
 import { Upload, BarChart3, TrendingUp, Plus, Eye, X } from 'lucide-react';
 import Papa from 'papaparse';
+import { Popup } from '../components/Popup';
 
 const API_BASE = 'http://localhost:8000/api';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
@@ -13,6 +14,12 @@ export default function OlympicsDataViz() {
   const [csvData, setCsvData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [user] = useState({ role: 'ROLE_DATA_PROVIDER' });
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   const token = localStorage.getItem('token'); // 🔹 JWT récupéré ici
 
@@ -149,7 +156,12 @@ export default function OlympicsDataViz() {
       });
     } catch (error) {
       console.error('Erreur upload:', error);
-      alert('Erreur lors de l\'upload du fichier');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de l\'upload du fichier'
+      });
     } finally {
       setLoading(false);
     }
@@ -189,7 +201,12 @@ export default function OlympicsDataViz() {
       loadVisualizations(selectedDataset.id);
     } catch (error) {
       console.error('Erreur création visualisation:', error);
-      alert('Erreur lors de la création de la visualisation');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de la création de la visualisation'
+      });
     } finally {
       setLoading(false);
     }
@@ -754,6 +771,15 @@ export default function OlympicsDataViz() {
           </div>
         </div>
       )}
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
     </div>
   );
 }

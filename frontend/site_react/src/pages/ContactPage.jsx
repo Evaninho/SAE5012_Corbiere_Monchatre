@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, MapPin, Phone } from 'lucide-react';
+import { Popup } from '../components/Popup';
 
 export function ContactPage() {
   // État pour les données du formulaire
@@ -16,6 +17,12 @@ export function ContactPage() {
   // État pour le statut d'envoi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [popup, setPopup] = useState({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   // Styles
   const pageStyle = {
@@ -267,7 +274,12 @@ export function ContactPage() {
 
     } catch (error) {
       console.error('Erreur lors de l\'envoi:', error);
-      alert('Une erreur est survenue. Veuillez réessayer.');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Une erreur est survenue. Veuillez réessayer.'
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -438,6 +450,15 @@ export function ContactPage() {
           </div>
         </div>
       </div>
+
+      {/* POPUP */}
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
     </main>
   );
 }

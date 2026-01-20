@@ -32,6 +32,7 @@ export const PERMISSIONS = {
     canRate: false,
     canAddFavorites: false,
     canCreateArticles: false,
+    canSupprimerArticles: false,
     canEditOwnArticles: false,
     canEditAllArticles: false,
     canImportData: false,
@@ -56,6 +57,7 @@ export const PERMISSIONS = {
     
     // Toujours restrictions
     canCreateArticles: false,
+    canSupprimerArticles: false,
     canEditOwnArticles: false,
     canEditAllArticles: false,
     canImportData: false,
@@ -79,6 +81,7 @@ export const PERMISSIONS = {
     
     // Nouvelles permissions
     canCreateArticles: true,
+    canSupprimerArticles: false,
     canEditOwnArticles: true,
     
     // Toujours restrictions
@@ -109,6 +112,7 @@ export const PERMISSIONS = {
     canRate: true,
     canAddFavorites: true,
     canCreateArticles: true,
+    canSupprimerArticles: true,
     canEditOwnArticles: true,
     
     // Nouvelles permissions
@@ -140,6 +144,7 @@ export const PERMISSIONS = {
     canRate: true,
     canAddFavorites: true,
     canCreateArticles: false,
+    canSupprimerArticles: false,
     canEditOwnArticles: false,
     canEditAllArticles: false,
     
@@ -172,6 +177,7 @@ export const PERMISSIONS = {
     canRate: true,
     canAddFavorites: true,
     canCreateArticles: true,
+    canSupprimerArticles: true,
     canEditOwnArticles: true,
     canEditAllArticles: true,
     canImportData: true,
