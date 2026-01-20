@@ -1,32 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, PieChart, Pie, LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer } from 'recharts';
-import { Upload, BarChart3, TrendingUp, Plus, Eye, X } from 'lucide-react';
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie,
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, Cell, ResponsiveContainer
+} from 'recharts';
+import { Upload, BarChart3, TrendingUp, Plus, X, RefreshCw, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 
+// ============ CONSTANTES ============
 const API_BASE = 'http://localhost:8000/api';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
-export default function OlympicsDataViz() {
+const AVAILABLE_DATASETS = [
+  {
+    filename: 'olympics_medals_country_wise.csv',
+    name: 'Médailles Olympiques par Pays',
+    description: 'Statistiques des médailles depuis 1896 (été et hiver)'
+  }
+];
+
+const CHART_TYPES = [
+  { value: 'bar', label: '📊 Graphique en barres', icon: BarChart3 },
+  { value: 'pie', label: '🥧 Camembert', icon: null },
+  { value: 'line', label: '📈 Graphique en ligne', icon: TrendingUp },
+  { value: 'scatter', label: '⚫ Nuage de points', icon: null }
+];
+
+// ============ COMPOSANT PRINCIPAL ============
+export default function StatsPage() {
+  // État des données
   const [datasets, setDatasets] = useState([]);
   const [selectedDataset, setSelectedDataset] = useState(null);
   const [visualizations, setVisualizations] = useState([]);
   const [csvData, setCsvData] = useState([]);
+  const [csvHeaders, setCsvHeaders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [user] = useState({ role: 'ROLE_DATA_PROVIDER' });
 
-  const token = localStorage.getItem('token'); // 🔹 JWT récupéré ici
-
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showCreateVizModal, setShowCreateVizModal] = useState(false);
-  const [showViewVizModal, setShowViewVizModal] = useState(false);
+  // État des modales
+  const [modals, setModals] = useState({
+    register: false,
+    createViz: false,
+    viewViz: false,
+  });
+  const [selectedLocalDataset, setSelectedLocalDataset] = useState(null);
   const [selectedViz, setSelectedViz] = useState(null);
 
-  const [uploadForm, setUploadForm] = useState({
-    name: '',
-    file: null,
-    fileName: ''
-  });
-
+  // État du formulaire de visualisation
   const [vizForm, setVizForm] = useState({
     chartType: 'bar',
     xAxis: '',
@@ -35,22 +54,88 @@ export default function OlympicsDataViz() {
     title: ''
   });
 
+  // ========== UTILITAIRES D'AUTHENTIFICATION ==========
+  const getToken = () => localStorage.getItem('authToken');
+
+  const getAuthHeaders = () => {
+    const token = getToken();
+    return {
+      'Content-Type': 'application/ld+json',
+      'Accept': 'application/ld+json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+  };
+
+  // ========== GESTION DES MODALES ==========
+  const openModal = (modalName) => {
+    setModals(prev => ({ ...prev, [modalName]: true }));
+  };
+
+  const closeModal = (modalName) => {
+    setModals(prev => ({ ...prev, [modalName]: false }));
+  };
+
+  // ========== CYCLE DE VIE ==========
   useEffect(() => {
-    loadDatasets();
+    const token = getToken();
+    if (!token) {
+      console.log('⚠️ Pas de token d\'authentification. Vous devez être connecté.');
+      alert('Vous devez être connecté pour accéder à cette page');
+      return;
+    }
+    loadDatasetsFromDB();
   }, []);
 
-  const loadDatasets = async () => {
+  // ========== CHARGEMENT DES DONNÉES ==========
+  const loadDatasetsFromDB = async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE}/datasets`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const data = await response.json();
       setDatasets(data['hydra:member'] || []);
     } catch (error) {
-      console.error('Erreur chargement datasets:', error);
+      console.error('❌ Erreur chargement datasets:', error);
+      alert('Erreur de chargement. Êtes-vous connecté ?');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLocalCSV = async (filename) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/datasets/${filename}`);
+      const csvText = await response.text();
+
+      return new Promise((resolve) => {
+        Papa.parse(csvText, {
+          header: true,
+          delimiter: ';',
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            setCsvData(results.data);
+            setCsvHeaders(results.meta.fields || []);
+            resolve({ data: results.data, headers: results.meta.fields });
+          },
+          error: (error) => {
+            console.error('❌ Erreur parsing CSV:', error);
+            alert('Erreur lors de la lecture du fichier CSV');
+            resolve(null);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('❌ Erreur chargement CSV:', error);
+      alert(`Impossible de charger ${filename}`);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -59,103 +144,101 @@ export default function OlympicsDataViz() {
   const loadVisualizations = async (datasetId) => {
     try {
       const response = await fetch(`${API_BASE}/datasets/${datasetId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
+
+      if (!response.ok) {
+        throw new Error('Erreur chargement visualisations');
+      }
+
       const data = await response.json();
       setVisualizations(data.visualizations || []);
     } catch (error) {
-      console.error('Erreur chargement visualisations:', error);
+      console.error('❌ Erreur:', error);
     }
   };
 
-  const loadCSVData = async (datasetPath) => {
-    try {
-      const response = await fetch(datasetPath, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const csvText = await response.text();
-      Papa.parse(csvText, {
-        header: true,
-        delimiter: ';',
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          setCsvData(results.data);
-        }
-      });
-    } catch (error) {
-      console.error('Erreur chargement CSV:', error);
-    }
+  // ========== INTERACTIONS UTILISATEUR ==========
+  const handleSelectDataset = async (dataset) => {
+    setSelectedDataset(dataset);
+    loadVisualizations(dataset.id);
+
+    const filename = dataset.path.split('/').pop();
+    await loadLocalCSV(filename);
   };
 
-  const handleUploadCSV = async () => {
-    if (!uploadForm.file) return;
+  const detectVariableType = (data, columnName) => {
+    const sample = data.slice(0, 10).map(row => row[columnName]);
+    const hasNumbers = sample.some(val => !isNaN(val) && val !== null && val !== '');
+    return hasNumbers ? 'numeric' : 'categorical';
+  };
 
-    const formData = new FormData();
-    formData.append('file', uploadForm.file);
-    formData.append('name', uploadForm.name);
+  // ========== ENREGISTREMENT DATASET ==========
+  const handleRegisterDataset = async () => {
+    if (!selectedLocalDataset) return;
 
     try {
       setLoading(true);
 
-      const uploadResponse = await fetch(`${API_BASE}/datasets/upload`, {
+      const csvResult = await loadLocalCSV(selectedLocalDataset.filename);
+      if (!csvResult) return;
+
+      const datasetResponse = await fetch(`${API_BASE}/datasets`, {
         method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: selectedLocalDataset.name,
+          path: `/datasets/${selectedLocalDataset.filename}`,
+        })
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error('Erreur lors de l\'upload');
+      if (!datasetResponse.ok) {
+        const errorData = await datasetResponse.json();
+        throw new Error(errorData.detail || 'Erreur lors de l\'enregistrement du dataset');
       }
 
-      const newDataset = await uploadResponse.json();
+      const newDataset = await datasetResponse.json();
 
-      Papa.parse(uploadForm.file, {
-        header: true,
-        delimiter: ';',
-        complete: async (results) => {
-          const headers = results.meta.fields;
+      // Créer les variables associées
+      for (let i = 0; i < csvResult.headers.length; i++) {
+        const header = csvResult.headers[i];
+        const type = detectVariableType(csvResult.data, header);
 
-          for (let i = 0; i < headers.length; i++) {
-            const header = headers[i];
-            const type = detectVariableType(results.data, header);
+        const varResponse = await fetch(`${API_BASE}/dataset_variables`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name: header,
+            type: type,
+            orderIndex: i,
+            dataset: `/api/datasets/${newDataset.id}`
+          })
+        });
 
-            await fetch(`${API_BASE}/dataset_variables`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/ld+json',
-                'Accept': 'application/ld+json',
-                'Authorization': `Bearer ${token}` // 🔹 JWT ajouté
-              },
-              body: JSON.stringify({
-                name: header,
-                type: type,
-                orderIndex: i,
-                dataset: `/api/datasets/${newDataset.id}`
-              })
-            });
-          }
-
-          setShowUploadModal(false);
-          setUploadForm({ name: '', file: null, fileName: '' });
-          loadDatasets();
+        if (!varResponse.ok) {
+          console.error(`Erreur création variable ${header}`);
         }
-      });
+      }
+
+      closeModal('register');
+      setSelectedLocalDataset(null);
+      loadDatasetsFromDB();
+      alert('✅ Dataset enregistré avec succès !');
     } catch (error) {
-      console.error('Erreur upload:', error);
-      alert('Erreur lors de l\'upload du fichier');
+      console.error('Erreur enregistrement:', error);
+      alert('❌ ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // ========== GESTION VISUALISATIONS ==========
   const handleCreateVisualization = async () => {
+    if (!vizForm.xAxis || !vizForm.yAxis) {
+      alert('Veuillez sélectionner les variables X et Y');
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -168,11 +251,7 @@ export default function OlympicsDataViz() {
 
       const response = await fetch(`${API_BASE}/visualizations`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/ld+json',
-          'Accept': 'application/ld+json',
-          'Authorization': `Bearer ${token}` // 🔹 JWT ajouté
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           chartType: vizForm.chartType,
           config: config,
@@ -181,156 +260,225 @@ export default function OlympicsDataViz() {
       });
 
       if (!response.ok) {
-        throw new Error('Erreur lors de la création de la visualisation');
+        const error = await response.json();
+        throw new Error(error.detail || 'Erreur lors de la création de la visualisation');
       }
 
-      setShowCreateVizModal(false);
+      const data = await response.json();
+      console.log('✅ Visualisation créée:', data);
+
+      closeModal('createViz');
       setVizForm({ chartType: 'bar', xAxis: '', yAxis: '', colors: COLORS, title: '' });
       loadVisualizations(selectedDataset.id);
+      alert('✅ Visualisation créée avec succès !');
     } catch (error) {
       console.error('Erreur création visualisation:', error);
-      alert('Erreur lors de la création de la visualisation');
+      alert('❌ ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectDataset = (dataset) => {
-    setSelectedDataset(dataset);
-    loadVisualizations(dataset.id);
-    loadCSVData(dataset.path);
-  };
+  const handleDeleteVisualization = async (vizId) => {
+    if (!window.confirm('⚠️ Êtes-vous sûr de vouloir supprimer cette visualisation ?')) {
+      return;
+    }
 
-  const renderChart = (viz, data) => {
-    const config = viz.config;
-    const chartData = data.slice(0, 15).map(row => ({
-      name: String(row[config.xAxis] || '').substring(0, 15),
-      value: parseFloat(row[config.yAxis]) || 0
-    }));
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/visualizations/${vizId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
 
-    switch (viz.chartType) {
-      case 'bar':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" fill="#0088FE" name={config.yAxis}>
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        );
+      if (!response.ok) throw new Error('Erreur suppression');
 
-      case 'pie':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <PieChart>
-              <Pie
-                data={chartData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={120}
-                label={(entry) => `${entry.name}: ${entry.value}`}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        );
-
-      case 'line':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="value" stroke="#0088FE" strokeWidth={2} name={config.yAxis} />
-            </LineChart>
-          </ResponsiveContainer>
-        );
-
-      case 'scatter':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" type="category" angle={-45} textAnchor="end" height={100} />
-              <YAxis dataKey="value" />
-              <Tooltip />
-              <Legend />
-              <Scatter data={chartData} fill="#0088FE" name={config.yAxis} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        );
-
-      default:
-        return <div>Type de graphique non supporté</div>;
+      closeModal('viewViz');
+      loadVisualizations(selectedDataset.id);
+      alert('✅ Visualisation supprimée');
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      alert('Erreur lors de la suppression');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ========== RENDU GRAPHIQUES ==========
+  const renderChart = (viz, data) => {
+    const config = viz.config;
+    const chartData = data.slice(0, 15).map(row => ({
+      name: String(row[config.xAxis] || '').substring(0, 20),
+      value: parseFloat(row[config.yAxis]) || 0
+    }));
+
+    const commonProps = { width: "100%", height: 400 };
+
+    const charts = {
+      bar: (
+        <ResponsiveContainer {...commonProps}>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="value" fill="#0088FE" name={config.yAxis}>
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      ),
+      pie: (
+        <ResponsiveContainer {...commonProps}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius={120}
+              label={(entry) => `${entry.name}: ${entry.value}`}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
+              ))}
+            </Pie>
+            <Tooltip />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      ),
+      line: (
+        <ResponsiveContainer {...commonProps}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="value" stroke="#0088FE" strokeWidth={2} name={config.yAxis} />
+          </LineChart>
+        </ResponsiveContainer>
+      ),
+      scatter: (
+        <ResponsiveContainer {...commonProps}>
+          <ScatterChart>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" type="category" angle={-45} textAnchor="end" height={100} />
+            <YAxis dataKey="value" />
+            <Tooltip />
+            <Legend />
+            <Scatter data={chartData} fill="#0088FE" name={config.yAxis} />
+          </ScatterChart>
+        </ResponsiveContainer>
+      )
+    };
+
+    return charts[viz.chartType] || <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Type non supporté</div>;
+  };
+
+  // ========== OBJETS DE STYLE ==========
   const styles = {
     container: {
       minHeight: '100vh',
-      backgroundColor: '#f5f5f5',
-      padding: '30px'
+      backgroundColor: '#f8f9fa',
+      padding: '30px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
     },
     header: {
       backgroundColor: 'white',
-      padding: '25px',
-      borderRadius: '15px',
+      padding: '30px',
+      borderRadius: '16px',
       marginBottom: '30px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
       display: 'flex',
       justifyContent: 'space-between',
-      alignItems: 'center'
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '20px'
     },
     title: {
-      fontSize: '28px',
-      fontWeight: 'bold',
-      color: '#0085C7',
-      margin: 0
+      fontSize: '32px',
+      fontWeight: '700',
+      color: '#1a202c',
+      margin: 0,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
     },
-    button: {
+    buttonPrimary: {
       padding: '12px 24px',
       backgroundColor: '#0085C7',
       color: 'white',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: '10px',
       cursor: 'pointer',
-      fontSize: '16px',
+      fontSize: '15px',
       fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'all 0.2s',
+      boxShadow: '0 2px 4px rgba(0,133,199,0.2)'
+    },
+    buttonSuccess: {
+      padding: '12px 24px',
+      backgroundColor: '#27ae60',
+      color: 'white',
+      border: 'none',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontSize: '15px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'all 0.2s'
+    },
+    sectionTitle: {
+      fontSize: '24px',
+      fontWeight: '600',
+      color: '#2d3748',
+      marginBottom: '20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    },
+    grid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+      gap: '24px',
+      marginBottom: '40px'
+    },
+    card: {
+      backgroundColor: 'white',
+      padding: '24px',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      border: '1px solid #e2e8f0'
+    },
+    cardTitle: {
+      fontSize: '18px',
+      fontWeight: '600',
+      color: '#0085C7',
+      marginBottom: '12px',
       display: 'flex',
       alignItems: 'center',
       gap: '8px'
     },
-    grid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-      gap: '20px',
-      marginBottom: '30px'
-    },
-    card: {
-      backgroundColor: 'white',
-      padding: '20px',
-      borderRadius: '12px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      cursor: 'pointer',
-      transition: 'transform 0.2s, box-shadow 0.2s'
+    cardText: {
+      fontSize: '14px',
+      color: '#718096',
+      marginBottom: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
     },
     modal: {
       position: 'fixed',
@@ -338,422 +486,425 @@ export default function OlympicsDataViz() {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(0,0,0,0.6)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000,
-      padding: '20px'
+      padding: '20px',
+      backdropFilter: 'blur(4px)'
     },
     modalContent: {
       backgroundColor: 'white',
-      borderRadius: '15px',
-      padding: '30px',
+      borderRadius: '16px',
+      padding: '32px',
       maxWidth: '600px',
       width: '100%',
       maxHeight: '90vh',
-      overflow: 'auto'
+      overflow: 'auto',
+      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
     },
     modalContentLarge: {
       backgroundColor: 'white',
-      borderRadius: '15px',
-      padding: '30px',
+      borderRadius: '16px',
+      padding: '32px',
       maxWidth: '1000px',
       width: '100%',
       maxHeight: '90vh',
-      overflow: 'auto'
+      overflow: 'auto',
+      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+    },
+    modalHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '24px',
+      paddingBottom: '16px',
+      borderBottom: '2px solid #e2e8f0'
+    },
+    modalTitle: {
+      fontSize: '24px',
+      fontWeight: '600',
+      color: '#1a202c',
+      margin: 0
     },
     input: {
       width: '100%',
-      padding: '12px',
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      fontSize: '14px',
-      marginBottom: '15px',
-      boxSizing: 'border-box'
+      padding: '14px 16px',
+      border: '2px solid #e2e8f0',
+      borderRadius: '10px',
+      fontSize: '15px',
+      marginBottom: '16px',
+      boxSizing: 'border-box',
+      transition: 'border-color 0.2s',
+      fontFamily: 'inherit'
     },
     select: {
       width: '100%',
-      padding: '12px',
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      fontSize: '14px',
-      marginBottom: '15px',
-      backgroundColor: 'white'
+      padding: '14px 16px',
+      border: '2px solid #e2e8f0',
+      borderRadius: '10px',
+      fontSize: '15px',
+      marginBottom: '16px',
+      backgroundColor: 'white',
+      cursor: 'pointer',
+      fontFamily: 'inherit'
     },
     label: {
       display: 'block',
       marginBottom: '8px',
       fontWeight: '600',
-      color: '#333'
-    }
-  };
-
-  // Styles supplémentaires pour les boutons de navigation
-  const buttonStyles = {
-    navButton: {
-      padding: '10px 20px',
-      backgroundColor: '#0085C7',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: '600',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      transition: 'background-color 0.3s'
+      color: '#2d3748',
+      fontSize: '14px'
     },
-    navButtonDisabled: {
-      padding: '10px 20px',
-      backgroundColor: '#ccc',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      cursor: 'not-allowed',
-      fontSize: '14px',
-      fontWeight: '600',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px'
-    },
-    datasetNav: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '15px',
-      justifyContent: 'space-between',
-      backgroundColor: 'white',
-      padding: '20px 25px',
-      borderRadius: '15px',
-      marginBottom: '30px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      flexWrap: 'wrap'
-    },
-    datasetInfo: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '15px',
-      flex: 1
-    },
-    datasetTitle: {
-      fontSize: '18px',
-      fontWeight: 'bold',
-      color: '#0085C7'
-    },
-    datasetPath: {
-      fontSize: '14px',
-      color: '#666'
-    },
-    chartContainer: {
-      backgroundColor: 'white',
-      borderRadius: '15px',
-      padding: '30px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      marginBottom: '30px'
-    },
-    chartTitle: {
-      fontSize: '20px',
-      fontWeight: 'bold',
-      color: '#0085C7',
-      marginBottom: '20px'
-    },
-    chart: {
-      width: '100%',
-      height: '400px',
-      backgroundColor: '#f9fafb',
+    infoBox: {
+      padding: '16px',
+      backgroundColor: '#f7fafc',
       borderRadius: '10px',
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'space-around',
-      padding: '20px',
-      gap: '10px'
+      marginBottom: '20px',
+      border: '1px solid #e2e8f0'
     },
-    chartBar: (height, maxHeight) => ({
-      flex: 1,
-      height: `${Math.max((height / maxHeight) * 350, 20)}px`,
-      backgroundColor: '#0085C7',
-      borderRadius: '5px 5px 0 0',
-      position: 'relative',
-      minHeight: '20px',
-      cursor: 'pointer',
-      transition: 'background-color 0.3s'
-    }),
-    chartBarLabel: {
-      fontSize: '12px',
-      color: '#666',
-      marginTop: '10px',
+    emptyState: {
       textAlign: 'center',
-      width: '100%'
+      padding: '60px 20px',
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      border: '2px dashed #cbd5e0'
+    },
+    loadingState: {
+      textAlign: 'center',
+      padding: '60px',
+      color: '#718096'
     }
   };
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>📊 Visualisation de Données - Jeux Olympiques</h1>
-        {user.role === 'ROLE_DATA_PROVIDER' && (
-          <button style={styles.button} onClick={() => setShowUploadModal(true)}>
-            <Upload size={20} />
-            Importer un CSV
-          </button>
-        )}
-      </div>
+  // ========== COMPOSANTS DE L'INTERFACE ==========
 
-      <div style={{ marginBottom: '30px' }}>
-        <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#333' }}>
-          📁 Jeux de données disponibles ({datasets.length})
-        </h2>
-        
-        {loading && datasets.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            Chargement des datasets...
-          </div>
-        ) : datasets.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            Aucun dataset disponible. Importez votre premier fichier CSV !
+  // Header principal
+  const Header = () => (
+    <div style={styles.header}>
+      <h1 style={styles.title}>📊 Visualisation de Données JO</h1>
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <button
+          style={styles.buttonPrimary}
+          onClick={() => openModal('register')}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <Upload size={20} /> Enregistrer un CSV
+        </button>
+        <button
+          style={styles.buttonSuccess}
+          onClick={loadDatasetsFromDB}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#229954'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#27ae60'}
+        >
+          <RefreshCw size={20} /> Actualiser
+        </button>
+      </div>
+    </div>
+  );
+
+  // Liste des datasets
+  const DatasetsList = () => (
+    <div>
+      <h2 style={styles.sectionTitle}>📁 Datasets enregistrés ({datasets.length})</h2>
+      {loading && datasets.length === 0 ? (
+        <div style={styles.loadingState}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ fontSize: '16px' }}>Chargement des datasets...</p>
+        </div>
+      ) : datasets.length === 0 ? (
+        <div style={styles.emptyState}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>📦</div>
+          <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
+            Aucun dataset enregistré
+          </p>
+          <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px' }}>
+            Commencez par enregistrer un fichier CSV depuis public/datasets/
+          </p>
+          <button style={styles.buttonPrimary} onClick={() => openModal('register')}>
+            <Upload size={20} /> Enregistrer votre premier CSV
+          </button>
+        </div>
+      ) : (
+        <div style={styles.grid}>
+          {datasets.map(dataset => (
+            <div
+              key={dataset.id}
+              style={styles.card}
+              onClick={() => handleSelectDataset(dataset)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+              }}
+            >
+              <h3 style={styles.cardTitle}>{dataset.name}</h3>
+              <p style={styles.cardText}>📄 {dataset.path.split('/').pop()}</p>
+              <p style={styles.cardText}>📊 {dataset.datasetVariables?.length || 0} variables</p>
+              <p style={styles.cardText}>📈 {dataset.visualizations?.length || 0} visualisations</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // Section des visualisations
+  const VisualizationsSection = () => {
+    if (!selectedDataset) return null;
+
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <h2 style={styles.sectionTitle}>📈 Visualisations - {selectedDataset.name}</h2>
+          <button
+            style={styles.buttonPrimary}
+            onClick={() => openModal('createViz')}
+          >
+            <Plus size={20} /> Créer une visualisation
+          </button>
+        </div>
+
+        {visualizations.length === 0 ? (
+          <div style={styles.emptyState}>
+            <div style={{ fontSize: '64px', marginBottom: '20px' }}>📊</div>
+            <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
+              Aucune visualisation créée
+            </p>
+            <button style={styles.buttonPrimary} onClick={() => openModal('createViz')}>
+              <Plus size={20} /> Créer la première visualisation
+            </button>
           </div>
         ) : (
           <div style={styles.grid}>
-            {datasets.map(dataset => (
+            {visualizations.map(viz => (
               <div
-                key={dataset.id}
+                key={viz.id}
                 style={styles.card}
-                onClick={() => handleSelectDataset(dataset)}
+                onClick={() => {
+                  setSelectedViz(viz);
+                  openModal('viewViz');
+                }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-4px)';
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
                 }}
               >
-                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#0085C7' }}>
-                  {dataset.name}
-                </h3>
-                <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-                  📅 Créé le {new Date(dataset.createdAt).toLocaleDateString('fr-FR')}
+                <div style={styles.cardTitle}>
+                  {viz.chartType === 'bar' && <BarChart3 size={24} />}
+                  {viz.chartType === 'line' && <TrendingUp size={24} />}
+                  {viz.config.title || `Graphique ${viz.chartType}`}
+                </div>
+                <p style={styles.cardText}>
+                  📊 Type: {CHART_TYPES.find(ct => ct.value === viz.chartType)?.label.split(' ').pop()}
                 </p>
-                <p style={{ fontSize: '14px', color: '#666' }}>
-                  📊 {dataset.datasetVariables?.length || 0} variables
-                </p>
-                <p style={{ fontSize: '14px', color: '#666' }}>
-                  📈 {dataset.visualizations?.length || 0} visualisations
-                </p>
+                <p style={styles.cardText}>📍 Variables: {viz.config.xAxis} / {viz.config.yAxis}</p>
               </div>
             ))}
           </div>
         )}
       </div>
+    );
+  };
 
-      {selectedDataset && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '22px', color: '#333' }}>
-              📈 Visualisations - {selectedDataset.name}
-            </h2>
-            <button style={styles.button} onClick={() => setShowCreateVizModal(true)}>
-              <Plus size={20} />
-              Créer une visualisation
+  // Modale d'enregistrement
+  const RegisterModal = () => {
+    if (!modals.register) return null;
+
+    return (
+      <div style={styles.modal} onClick={() => closeModal('register')}>
+        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div style={styles.modalHeader}>
+            <h2 style={styles.modalTitle}>📤 Enregistrer un CSV local</h2>
+            <button
+              onClick={() => closeModal('register')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+            >
+              <X size={28} color="#718096" />
             </button>
           </div>
 
-          {visualizations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', backgroundColor: 'white', borderRadius: '12px' }}>
-              <p style={{ color: '#666', marginBottom: '20px' }}>
-                Aucune visualisation créée pour ce dataset.
+          <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px', lineHeight: '1.6' }}>
+            Sélectionnez un fichier CSV disponible dans{' '}
+            <code style={{ backgroundColor: '#f7fafc', padding: '2px 6px', borderRadius: '4px', fontSize: '13px' }}>
+              public/datasets/
+            </code>
+          </p>
+
+          <label style={styles.label}>Fichier CSV disponible</label>
+          <select
+            style={styles.select}
+            value={selectedLocalDataset?.filename || ''}
+            onChange={(e) => {
+              const selected = AVAILABLE_DATASETS.find(d => d.filename === e.target.value);
+              setSelectedLocalDataset(selected);
+            }}
+          >
+            <option value="">Sélectionner un fichier</option>
+            {AVAILABLE_DATASETS.map(dataset => (
+              <option key={dataset.filename} value={dataset.filename}>
+                {dataset.name} ({dataset.filename})
+              </option>
+            ))}
+          </select>
+
+          {selectedLocalDataset && (
+            <div style={styles.infoBox}>
+              <p style={{ fontSize: '15px', color: '#2d3748', margin: '0 0 8px 0', fontWeight: '600' }}>
+                📄 {selectedLocalDataset.name}
               </p>
-              <button style={styles.button} onClick={() => setShowCreateVizModal(true)}>
-                <Plus size={20} />
-                Créer la première visualisation
-              </button>
-            </div>
-          ) : (
-            <div style={styles.grid}>
-              {visualizations.map(viz => (
-                <div
-                  key={viz.id}
-                  style={styles.card}
-                  onClick={() => {
-                    setSelectedViz(viz);
-                    setShowViewVizModal(true);
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                    {viz.chartType === 'bar' && <BarChart3 size={24} color="#0085C7" />}
-                    {viz.chartType === 'line' && <TrendingUp size={24} color="#0085C7" />}
-                    <h3 style={{ fontSize: '18px', color: '#333', margin: 0 }}>
-                      {viz.config.title || `Graphique ${viz.chartType}`}
-                    </h3>
-                  </div>
-                  <p style={{ fontSize: '14px', color: '#666' }}>
-                    Type: {viz.chartType === 'bar' ? 'Barres' : viz.chartType === 'pie' ? 'Camembert' : viz.chartType === 'line' ? 'Ligne' : 'Nuage de points'}
-                  </p>
-                  <p style={{ fontSize: '14px', color: '#666' }}>
-                    Variables: {viz.config.xAxis} / {viz.config.yAxis}
-                  </p>
-                </div>
-              ))}
+              <p style={{ fontSize: '14px', color: '#718096', margin: 0 }}>
+                {selectedLocalDataset.description}
+              </p>
             </div>
           )}
+
+          <button
+            onClick={handleRegisterDataset}
+            style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '8px' }}
+            disabled={loading || !selectedLocalDataset}
+          >
+            {loading ? '⏳ Enregistrement...' : '✅ Enregistrer dans la BDD'}
+          </button>
         </div>
-      )}
+      </div>
+    );
+  };
 
-      {showUploadModal && (
-        <div style={styles.modal} onClick={() => setShowUploadModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>📤 Importer un fichier CSV</h2>
-              <button onClick={() => setShowUploadModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} />
-              </button>
-            </div>
+  // Modale de création de visualisation
+  const CreateVizModal = () => {
+    if (!modals.createViz || !selectedDataset) return null;
 
-            <label style={styles.label}>Nom du dataset</label>
-            <input
-              type="text"
-              style={styles.input}
-              placeholder="Ex: Médailles JO 2024"
-              value={uploadForm.name}
-              onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
-            />
-
-            <label style={styles.label}>Fichier CSV (séparateur: ;)</label>
-            <input
-              type="file"
-              accept=".csv"
-              style={styles.input}
-              onChange={(e) => setUploadForm({
-                ...uploadForm,
-                file: e.target.files[0],
-                fileName: e.target.files[0]?.name || ''
-              })}
-            />
-
-            {uploadForm.fileName && (
-              <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
-                📄 Fichier sélectionné: {uploadForm.fileName}
-              </p>
-            )}
-
+    return (
+      <div style={styles.modal} onClick={() => closeModal('createViz')}>
+        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div style={styles.modalHeader}>
+            <h2 style={styles.modalTitle}>📊 Créer une visualisation</h2>
             <button
-              onClick={handleUploadCSV}
-              style={{ ...styles.button, width: '100%', justifyContent: 'center' }}
-              disabled={loading || !uploadForm.name || !uploadForm.file}
+              onClick={() => closeModal('createViz')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
             >
-              {loading ? 'Upload en cours...' : 'Importer le fichier'}
+              <X size={28} color="#718096" />
             </button>
           </div>
-        </div>
-      )}
 
-      {showCreateVizModal && selectedDataset && (
-        <div style={styles.modal} onClick={() => setShowCreateVizModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>📊 Créer une visualisation</h2>
-              <button onClick={() => setShowCreateVizModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} />
+          <label style={styles.label}>Titre de la visualisation</label>
+          <input
+            type="text"
+            style={styles.input}
+            placeholder="Ex: Médailles d'or par pays"
+            value={vizForm.title}
+            onChange={(e) => setVizForm({ ...vizForm, title: e.target.value })}
+            onFocus={(e) => e.target.style.borderColor = '#0085C7'}
+            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+          />
+
+          <label style={styles.label}>Type de graphique</label>
+          <select
+            style={styles.select}
+            value={vizForm.chartType}
+            onChange={(e) => setVizForm({ ...vizForm, chartType: e.target.value })}
+          >
+            {CHART_TYPES.map(ct => (
+              <option key={ct.value} value={ct.value}>
+                {ct.label}
+              </option>
+            ))}
+          </select>
+
+          <label style={styles.label}>Variable X (axe horizontal / catégorie)</label>
+          <select
+            style={styles.select}
+            value={vizForm.xAxis}
+            onChange={(e) => setVizForm({ ...vizForm, xAxis: e.target.value })}
+          >
+            <option value="">Sélectionner une variable</option>
+            {selectedDataset.datasetVariables?.map(variable => (
+              <option key={variable.id} value={variable.name}>
+                {variable.name} ({variable.type})
+              </option>
+            ))}
+          </select>
+
+          <label style={styles.label}>Variable Y (axe vertical / valeur numérique)</label>
+          <select
+            style={styles.select}
+            value={vizForm.yAxis}
+            onChange={(e) => setVizForm({ ...vizForm, yAxis: e.target.value })}
+          >
+            <option value="">Sélectionner une variable</option>
+            {selectedDataset.datasetVariables?.filter(v => v.type === 'numeric').map(variable => (
+              <option key={variable.id} value={variable.name}>
+                {variable.name}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={handleCreateVisualization}
+            style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '16px' }}
+            disabled={!vizForm.xAxis || !vizForm.yAxis || loading}
+          >
+            {loading ? '⏳ Création...' : '✅ Créer la visualisation'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Modale de visualisation
+  const ViewVizModal = () => {
+    if (!modals.viewViz || !selectedViz) return null;
+
+    return (
+      <div style={styles.modal} onClick={() => closeModal('viewViz')}>
+        <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
+          <div style={styles.modalHeader}>
+            <h2 style={styles.modalTitle}>{selectedViz.config?.title || 'Visualisation'}</h2>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => handleDeleteVisualization(selectedViz.id)}
+                style={{ ...styles.buttonPrimary, backgroundColor: '#e53e3e', padding: '8px 12px' }}
+              >
+                <Trash2 size={18} />
+              </button>
+              <button
+                onClick={() => closeModal('viewViz')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <X size={28} color="#718096" />
               </button>
             </div>
-
-            <label style={styles.label}>Titre de la visualisation</label>
-            <input
-              type="text"
-              style={styles.input}
-              placeholder="Ex: Médailles par pays"
-              value={vizForm.title}
-              onChange={(e) => setVizForm({ ...vizForm, title: e.target.value })}
-            />
-
-            <label style={styles.label}>Type de graphique</label>
-            <select
-              style={styles.select}
-              value={vizForm.chartType}
-              onChange={(e) => setVizForm({ ...vizForm, chartType: e.target.value })}
-            >
-              <option value="bar">📊 Graphique en barres</option>
-              <option value="pie">🥧 Camembert</option>
-              <option value="line">📈 Graphique en ligne</option>
-              <option value="scatter">⚫ Nuage de points</option>
-            </select>
-
-            <label style={styles.label}>Variable X (axe horizontal / catégorie)</label>
-            <select
-              style={styles.select}
-              value={vizForm.xAxis}
-              onChange={(e) => setVizForm({ ...vizForm, xAxis: e.target.value })}
-            >
-              <option value="">Sélectionner une variable</option>
-              {selectedDataset.datasetVariables?.map(variable => (
-                <option key={variable.id} value={variable.name}>
-                  {variable.name} ({variable.type})
-                </option>
-              ))}
-            </select>
-
-            <label style={styles.label}>Variable Y (axe vertical / valeur)</label>
-            <select
-              style={styles.select}
-              value={vizForm.yAxis}
-              onChange={(e) => setVizForm({ ...vizForm, yAxis: e.target.value })}
-            >
-              <option value="">Sélectionner une variable</option>
-              {selectedDataset.datasetVariables?.filter(v => v.type === 'numeric').map(variable => (
-                <option key={variable.id} value={variable.name}>
-                  {variable.name}
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={handleCreateVisualization}
-              style={{ ...styles.button, width: '100%', justifyContent: 'center' }}
-              disabled={loading || !vizForm.title || !vizForm.xAxis || !vizForm.yAxis}
-            >
-              {loading ? 'Création en cours...' : 'Créer la visualisation'}
-            </button>
           </div>
+
+          {csvData.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#718096' }}>Aucune donnée chargée</p>
+          ) : (
+            renderChart(selectedViz, csvData)
+          )}
         </div>
-      )}
+      </div>
+    );
+  };
 
-      {showViewVizModal && selectedViz && csvData.length > 0 && (
-        <div style={styles.modal} onClick={() => setShowViewVizModal(false)}>
-          <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>
-                {selectedViz.config.title || 'Visualisation'}
-              </h2>
-              <button onClick={() => setShowViewVizModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            {renderChart(selectedViz, csvData)}
-
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Type:</strong> {selectedViz.chartType}
-              </p>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Variable X:</strong> {selectedViz.config.xAxis}
-              </p>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Variable Y:</strong> {selectedViz.config.yAxis}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+  // ========== RENDU FINAL ==========
+  return (
+    <div style={styles.container}>
+      <Header />
+      <DatasetsList />
+      <VisualizationsSection />
+      <RegisterModal />
+      <CreateVizModal />
+      <ViewVizModal />
     </div>
   );
 }
