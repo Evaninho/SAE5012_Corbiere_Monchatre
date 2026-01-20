@@ -27,7 +27,6 @@ export default function StatsPage() {
   // État des données
   const [datasets, setDatasets] = useState([]);
   const [selectedDataset, setSelectedDataset] = useState(null);
-  const [visualizations, setVisualizations] = useState([]);
   const [csvData, setCsvData] = useState([]);
   const [csvHeaders, setCsvHeaders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -59,6 +58,10 @@ export default function StatsPage() {
     colors: COLORS,
     title: ''
   });
+
+  // États pour les contrôles de visualisation
+  const [chartRowsLimit, setChartRowsLimit] = useState(15);
+  const [chartSortOrder, setChartSortOrder] = useState('none');
 
   // ========== UTILITAIRES D'AUTHENTIFICATION ==========
   const getToken = () => localStorage.getItem('authToken');
@@ -96,29 +99,78 @@ export default function StatsPage() {
   const loadDatasetsFromDB = async () => {
     try {
       setLoading(true);
+      const token = getToken();
+      console.log('🔐 Token présent:', !!token);
+      console.log('🔑 Token valeur:', token ? `${token.substring(0, 20)}...` : 'AUCUN');
+      
       const response = await fetch(`${API_BASE}/datasets`, {
         headers: getAuthHeaders()
       });
+
+      console.log('📡 Réponse API /datasets:', response.status, response.ok);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
 
       const data = await response.json();
-      setDatasets(data['hydra:member'] || []);
+      console.log('📦 Données reçues de l\'API:', data);
+      
+      const datasetsWithViz = data.member || data['hydra:member'] || [];
+      console.log('📊 Datasets trouvés:', datasetsWithViz.length);
+      
+      // Charger les visualisations pour chaque dataset
+      const datasetsEnriched = await Promise.all(
+        datasetsWithViz.map(async (dataset) => {
+          try {
+            const vizResponse = await fetch(`${API_BASE}/datasets/${dataset.id}`, {
+              headers: getAuthHeaders()
+            });
+            if (vizResponse.ok) {
+              const vizData = await vizResponse.json();
+              return {
+                ...dataset,
+                visualizations: vizData.visualizations || []
+              };
+            }
+          } catch (error) {
+            console.error(`Erreur chargement visualisations du dataset ${dataset.id}:`, error);
+          }
+          return dataset;
+        })
+      );
+      
+      console.log('✅ Datasets finaux:', datasetsEnriched);
+      setDatasets(datasetsEnriched);
     } catch (error) {
       console.error('❌ Erreur chargement datasets:', error);
-      alert('Erreur de chargement. Êtes-vous connecté ?');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur de connexion',
+        message: 'Impossible de charger les datasets. Êtes-vous connecté ?'
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const loadLocalCSV = async (filename) => {
+  const loadLocalCSV = async (datasetId, filename) => {
     try {
       setLoading(true);
-      const response = await fetch(`${BACKEND_BASE}/datasets/${filename}`);
+      console.log(`📥 Chargement du CSV pour le dataset ${datasetId}:`, filename);
+      
+      // Utiliser l'API pour télécharger le CSV (évite les problèmes CORS)
+      const response = await fetch(`${API_BASE}/datasets/${datasetId}/download`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const csvText = await response.text();
+      console.log('✅ CSV chargé avec succès');
 
       return new Promise((resolve) => {
         Papa.parse(csvText, {
@@ -126,21 +178,38 @@ export default function StatsPage() {
           delimiter: ',',
           dynamicTyping: true,
           skipEmptyLines: true,
+          trimHeaders: true,  // 🔧 Trim les espaces des en-têtes
+          transformHeader: (h) => h.trim(),  // 🔧 Transform les en-têtes aussi
           complete: (results) => {
-            setCsvData(results.data);
-            setCsvHeaders(results.meta.fields || []);
-            resolve({ data: results.data, headers: results.meta.fields });
+            // Trim les clés de tous les objets
+            const trimmedData = results.data.map(row => {
+              const newRow = {};
+              Object.keys(row).forEach(key => {
+                newRow[key.trim()] = row[key];
+              });
+              return newRow;
+            });
+            
+            setCsvData(trimmedData);
+            const trimmedFields = (results.meta.fields || []).map(f => f.trim());
+            setCsvHeaders(trimmedFields);
+            console.log(`📊 Données parsées: ${trimmedData.length} lignes, ${trimmedFields.length} colonnes`, trimmedFields);
+            resolve({ data: trimmedData, headers: trimmedFields });
           },
           error: (error) => {
             console.error('❌ Erreur parsing CSV:', error);
-            alert('Erreur lors de la lecture du fichier CSV');
             resolve(null);
           }
         });
       });
     } catch (error) {
       console.error('❌ Erreur chargement CSV:', error);
-      alert(`Impossible de charger ${filename}`);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: `Impossible de charger le fichier: ${error.message}`
+      });
       return null;
     } finally {
       setLoading(false);
@@ -158,7 +227,11 @@ export default function StatsPage() {
       }
 
       const data = await response.json();
-      setVisualizations(data.visualizations || []);
+      // Mettre à jour le dataset sélectionné avec les visualisations
+      setSelectedDataset(prev => ({
+        ...prev,
+        visualizations: data.visualizations || []
+      }));
     } catch (error) {
       console.error('❌ Erreur:', error);
     }
@@ -166,11 +239,12 @@ export default function StatsPage() {
 
   // ========== INTERACTIONS UTILISATEUR ==========
   const handleSelectDataset = async (dataset) => {
+    console.log('📌 Sélection du dataset:', dataset.name);
     setSelectedDataset(dataset);
     loadVisualizations(dataset.id);
 
     const filename = dataset.path.split('/').pop();
-    await loadLocalCSV(filename);
+    await loadLocalCSV(dataset.id, filename);
   };
 
   const detectVariableType = (data, columnName) => {
@@ -371,23 +445,104 @@ export default function StatsPage() {
   // ========== RENDU GRAPHIQUES ==========
   const renderChart = (viz, data) => {
     const config = viz.config;
-    const chartData = data.slice(0, 15).map(row => ({
-      name: String(row[config.xAxis] || '').substring(0, 20),
-      value: parseFloat(row[config.yAxis]) || 0
-    }));
+    
+    // Trouver les vraies clés dans les données (trim les espaces)
+    const getDataValue = (row, key) => {
+      // Chercher d'abord la clé exacte
+      if (row.hasOwnProperty(key)) {
+        return row[key];
+      }
+      // Si pas trouvée, chercher en trimant les espaces
+      const trimmedKey = Object.keys(row).find(k => k.trim() === key.trim());
+      return trimmedKey ? row[trimmedKey] : null;
+    };
+    
+    // Mapper les données avec validation et trim des clés
+    // Important: on traite TOUTES les données d'abord, puis on trie, puis on limite
+    let chartData = data.map(row => {
+      const xValue = String(getDataValue(row, config.xAxis) || '').substring(0, 25).trim();
+      const yValue = parseFloat(getDataValue(row, config.yAxis)) || 0;
+      return {
+        name: xValue || '(vide)',
+        value: yValue,
+        _original: row
+      };
+    }).filter(item => item.name !== '(vide)' || item.value !== 0);
 
-    const commonProps = { width: "100%", height: 400 };
+    // Appliquer le tri
+    if (chartSortOrder === 'asc') {
+      chartData = chartData.sort((a, b) => a.value - b.value);
+    } else if (chartSortOrder === 'desc') {
+      chartData = chartData.sort((a, b) => b.value - a.value);
+    }
+
+    // Limiter le nombre de données affichées selon la sélection de l'utilisateur
+    chartData = chartData.slice(0, chartRowsLimit);
+
+    // Hauteur dynamique : minimum 400px, puis ajustée selon le nombre de lignes
+    const dynamicHeight = Math.max(400, 200 + chartData.length * 20);
+
+    console.log('📊 Chart Data:', { 
+      xAxis: config.xAxis, 
+      yAxis: config.yAxis,
+      rowsLimit: chartRowsLimit,
+      sortOrder: chartSortOrder,
+      firstEntry: chartData[0],
+      dataCount: chartData.length,
+      dynamicHeight
+    });
+
+    const commonProps = { width: "100%", height: dynamicHeight };
+
+    // Tooltip personnalisé pour tous les graphiques
+    const CustomTooltip = ({ active, payload }) => {
+      if (active && payload && payload.length) {
+        const dataPoint = payload[0];
+        // Accès aux données originales du chartData via payload[0].payload
+        const originalData = dataPoint.payload;
+        
+        return (
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            padding: '14px 16px',
+            border: '3px solid #0088FE',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            zIndex: 1000,
+            fontFamily: 'system-ui, -apple-system, sans-serif'
+          }}>
+            <p style={{ margin: '6px 0', fontWeight: 'bold', color: '#1a202c', fontSize: '14px' }}>
+              📍 {config.xAxis}: <span style={{ color: '#0088FE' }}>{originalData.name}</span>
+            </p>
+            <p style={{ margin: '6px 0', color: '#2d3748', fontWeight: '600', fontSize: '14px' }}>
+              📊 {config.yAxis}: <strong style={{ color: '#FF8042', fontSize: '16px' }}>{originalData.value}</strong>
+            </p>
+          </div>
+        );
+      }
+      return null;
+    };
 
     const charts = {
       bar: (
         <ResponsiveContainer {...commonProps}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="value" fill="#0088FE" name={config.yAxis}>
+          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45} 
+              textAnchor="end" 
+              height={100}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis style={{ fontSize: '12px' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 136, 254, 0.1)' }} />
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              verticalAlign="top"
+              height={36}
+            />
+            <Bar dataKey="value" fill="#0088FE" name={config.yAxis || 'Valeur'}>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
               ))}
@@ -397,46 +552,92 @@ export default function StatsPage() {
       ),
       pie: (
         <ResponsiveContainer {...commonProps}>
-          <PieChart>
+          <PieChart margin={{ top: 20, right: 30, bottom: 80, left: 0 }}>
             <Pie
               data={chartData}
               dataKey="value"
               nameKey="name"
-              cx="50%"
-              cy="50%"
-              outerRadius={120}
-              label={(entry) => `${entry.name}: ${entry.value}`}
+              cx="40%"
+              cy="45%"
+              outerRadius={110}
+              label={({ name, value }) => `${name}: ${value}`}
+              labelLine={true}
             >
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
               ))}
             </Pie>
-            <Tooltip />
-            <Legend />
+            <Tooltip 
+              content={<CustomTooltip />}
+              formatter={(value) => `${config.yAxis}: ${value}`}
+              labelFormatter={(label) => `${config.xAxis}: ${label}`}
+            />
+            <Legend 
+              verticalAlign="bottom" 
+              height={36}
+              wrapperStyle={{ paddingTop: '20px' }}
+            />
           </PieChart>
         </ResponsiveContainer>
       ),
       line: (
         <ResponsiveContainer {...commonProps}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="value" stroke="#0088FE" strokeWidth={2} name={config.yAxis} />
+          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45} 
+              textAnchor="end" 
+              height={100}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis style={{ fontSize: '12px' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#0088FE', strokeWidth: 2 }} />
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              verticalAlign="top"
+              height={36}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="value" 
+              stroke="#0088FE" 
+              strokeWidth={3}
+              dot={{ fill: '#0088FE', r: 5 }}
+              activeDot={{ r: 7, fill: '#FF8042' }}
+              name={config.yAxis || 'Valeur'}
+            />
           </LineChart>
         </ResponsiveContainer>
       ),
       scatter: (
         <ResponsiveContainer {...commonProps}>
-          <ScatterChart>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" type="category" angle={-45} textAnchor="end" height={100} />
-            <YAxis dataKey="value" />
-            <Tooltip />
-            <Legend />
-            <Scatter data={chartData} fill="#0088FE" name={config.yAxis} />
+          <ScatterChart margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="name" 
+              type="category" 
+              angle={-45} 
+              textAnchor="end" 
+              height={100}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis 
+              dataKey="value"
+              style={{ fontSize: '12px' }}
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 136, 254, 0.1)' }} />
+            <Legend 
+              verticalAlign="top"
+              height={36}
+              wrapperStyle={{ paddingTop: '20px' }}
+            />
+            <Scatter 
+              data={chartData} 
+              fill="#0088FE" 
+              name={config.yAxis || 'Valeur'}
+              shape="circle"
+            />
           </ScatterChart>
         </ResponsiveContainer>
       )
@@ -685,10 +886,24 @@ export default function StatsPage() {
             Aucun dataset enregistré
           </p>
           <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px' }}>
-            Commencez par enregistrer un fichier CSV depuis public/datasets/
+            Vérifiez que vous êtes connecté et que des datasets existent en base de données.
           </p>
-          <button style={styles.buttonPrimary} onClick={() => openModal('upload')}>
-            <Upload size={20} /> Uploader votre premier CSV
+          <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#edf2f7', borderRadius: '8px', borderLeft: '4px solid #4299e1' }}>
+            <p style={{ fontSize: '12px', color: '#2d3748', margin: 0 }}>
+              💡 Ouvrez la console (F12) pour voir les messages de debug
+            </p>
+          </div>
+          <button 
+            style={styles.buttonPrimary} 
+            onClick={() => {
+              console.log('🔄 Rechargement manuel des datasets...');
+              loadDatasetsFromDB();
+            }}
+          >
+            🔄 Recharger les datasets
+          </button>
+          <button style={{ ...styles.buttonPrimary, marginLeft: '10px', backgroundColor: '#48bb78' }} onClick={() => openModal('upload')}>
+            <Upload size={20} /> Uploader un CSV
           </button>
         </div>
       ) : (
@@ -722,6 +937,8 @@ export default function StatsPage() {
   const VisualizationsSection = () => {
     if (!selectedDataset) return null;
 
+    const vizList = selectedDataset.visualizations || [];
+
     return (
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -734,7 +951,7 @@ export default function StatsPage() {
           </button>
         </div>
 
-        {visualizations.length === 0 ? (
+        {vizList.length === 0 ? (
           <div style={styles.emptyState}>
             <div style={{ fontSize: '64px', marginBottom: '20px' }}>📊</div>
             <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
@@ -746,7 +963,7 @@ export default function StatsPage() {
           </div>
         ) : (
           <div style={styles.grid}>
-            {visualizations.map(viz => (
+            {vizList.map(viz => (
               <div
                 key={viz.id}
                 style={styles.card}
@@ -949,6 +1166,55 @@ export default function StatsPage() {
               >
                 <X size={28} color="#718096" />
               </button>
+            </div>
+          </div>
+
+          {/* Contrôles pour l'affichage du graphique */}
+          <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', padding: '16px', backgroundColor: '#f7fafc', borderRadius: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+                📊 Nombre de lignes:
+              </label>
+              <select
+                value={chartRowsLimit}
+                onChange={(e) => setChartRowsLimit(parseInt(e.target.value))}
+                style={{
+                  padding: '8px 12px',
+                  border: '2px solid #cbd5e0',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value={15}>Top 15</option>
+                <option value={30}>Top 30</option>
+                <option value={50}>Top 50</option>
+                <option value={100}>Top 100</option>
+                <option value={9999}>Toutes les données ({csvData.length})</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+                📈 Tri:
+              </label>
+              <select
+                value={chartSortOrder}
+                onChange={(e) => setChartSortOrder(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  border: '2px solid #cbd5e0',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                <option value="none">Aucun tri</option>
+                <option value="asc">Croissant ↑</option>
+                <option value="desc">Décroissant ↓</option>
+              </select>
             </div>
           </div>
 

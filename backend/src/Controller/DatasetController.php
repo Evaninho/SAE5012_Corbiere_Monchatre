@@ -10,11 +10,29 @@ use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\String\Slugger\SluggerInterface;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route('/api')]
 class DatasetController extends AbstractController
 {
+    #[Route('/datasets/{id}/download', name: 'dataset_download', methods: ['GET'])]
+    public function download(Dataset $dataset): Response
+    {
+        $filePath = $this->getParameter('datasets_directory') . '/' . basename($dataset->getPath());
+        
+        if (!file_exists($filePath)) {
+            return new JsonResponse(['error' => 'File not found'], 404);
+        }
+
+        $csvContent = file_get_contents($filePath);
+        
+        return new Response($csvContent, 200, [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'inline; filename="' . basename($dataset->getPath()) . '"'
+        ]);
+    }
+
     #[Route('/datasets/upload', name: 'dataset_upload', methods: ['POST'])]
     public function upload(Request $request, EntityManagerInterface $em, SluggerInterface $slugger): JsonResponse
     {
@@ -27,12 +45,28 @@ class DatasetController extends AbstractController
 
         $originalFilename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $safeFilename = $slugger->slug($originalFilename);
-        $newFilename = $safeFilename.'-'.uniqid().'.'.$file->guessExtension();
-
+        $extension = $file->guessExtension();
+        $newFilename = $safeFilename.'.'.$extension;
+        
+        $datasetsDir = $this->getParameter('datasets_directory');
+        
+        // Vérifier si le fichier existe déjà et ne pas créer de doublon
+        $counter = 1;
+        $baseFilename = $safeFilename;
+        while (file_exists($datasetsDir . '/' . $newFilename)) {
+            $newFilename = $baseFilename . '-' . $counter . '.' . $extension;
+            $counter++;
+        }
+        
         try {
-            $file->move($this->getParameter('datasets_directory'), $newFilename);
+            $uploadedFile = $file->move($datasetsDir, $newFilename);
+            $filePath = $uploadedFile->getPathname();
         } catch (FileException $e) {
-            return new JsonResponse(['error' => 'Upload failed'], 500);
+            return new JsonResponse(['error' => 'Upload failed: ' . $e->getMessage()], 500);
+        }
+
+        if (!file_exists($filePath)) {
+            return new JsonResponse(['error' => 'File not found after upload'], 500);
         }
 
         $dataset = new Dataset();
@@ -44,10 +78,6 @@ class DatasetController extends AbstractController
         $em->persist($dataset);
 
         // Lire le CSV pour créer DatasetVariables
-        $filePath = $this->getParameter('datasets_directory') . '/' . $newFilename;
-        if (!file_exists($filePath)) {
-            return new JsonResponse(['error' => 'File not found after upload'], 500);
-        }
 
         try {
             $csvContent = file_get_contents($filePath);
@@ -90,7 +120,7 @@ class DatasetController extends AbstractController
             }
 
             $variable = new DatasetVariable();
-            $variable->setName($header);
+            $variable->setName(trim($header));  // 🔧 Trim ici aussi
             $variable->setType($isNumeric ? 'numeric' : 'categorical');
             $variable->setOrderIndex($index);
             $variable->setDataset($dataset);

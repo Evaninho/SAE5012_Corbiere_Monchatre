@@ -9,10 +9,10 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: VisualizationRepository::class)]
 #[ApiResource(
      operations: [
-        new Get(),
-        new GetCollection(),
-        new Post(security: "is_granted('ROLE_USER')"),
-        new Put(security: "is_granted('ROLE_USER')"),
+        new Get(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
+        new GetCollection(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
+        new Post(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
+        new Put(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
         new Delete(security: "is_granted('ROLE_ADMIN')")
     ],
     normalizationContext: ['groups' => ['visualization:read']],

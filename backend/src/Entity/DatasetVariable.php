@@ -10,8 +10,8 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: DatasetVariableRepository::class)]
 #[ApiResource(
     operations: [
-        new Get(),
-        new Post(security: "is_granted('ROLE_USER')")
+        new Get(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
+        new Post(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')")
     ],
     normalizationContext: ['groups' => ['variable:read']],
     denormalizationContext: ['groups' => ['variable:write']]
