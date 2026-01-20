@@ -44,8 +44,40 @@ class DatasetController extends AbstractController
         $em->persist($dataset);
 
         // Lire le CSV pour créer DatasetVariables
-        $csv = array_map('str_getcsv', file($file->getPathname()));
-        $headers = array_map('trim', $csv[0] ?? []);
+        $filePath = $this->getParameter('datasets_directory') . '/' . $newFilename;
+        if (!file_exists($filePath)) {
+            return new JsonResponse(['error' => 'File not found after upload'], 500);
+        }
+
+        try {
+            $csvContent = file_get_contents($filePath);
+            if (empty($csvContent)) {
+                return new JsonResponse(['error' => 'Empty CSV file'], 400);
+            }
+
+            // Parse CSV with proper delimiter detection
+            $csv = array_map(function($line) {
+                return str_getcsv($line, ',', '"', '\\');
+            }, explode("\n", trim($csvContent)));
+
+            // Remove empty lines
+            $csv = array_filter($csv, function($row) {
+                return !empty(array_filter($row));
+            });
+
+            if (empty($csv)) {
+                return new JsonResponse(['error' => 'No valid data found in CSV'], 400);
+            }
+
+            $headers = array_map('trim', $csv[0]);
+            $dataRows = array_slice($csv, 1);
+
+            if (empty($headers) || empty($dataRows)) {
+                return new JsonResponse(['error' => 'CSV must have headers and at least one data row'], 400);
+            }
+        } catch (\Exception $e) {
+            return new JsonResponse(['error' => 'Error reading CSV file: ' . $e->getMessage()], 500);
+        }
 
         foreach ($headers as $index => $header) {
             $columnSample = array_column(array_slice($csv, 1), $index);

@@ -10,15 +10,10 @@ import { Popup } from '../components/Popup';
 
 // ============ CONSTANTES ============
 const API_BASE = 'http://localhost:8000/api';
+const BACKEND_BASE = 'http://localhost:8000';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
-const AVAILABLE_DATASETS = [
-  {
-    filename: 'olympics_medals_country_wise.csv',
-    name: 'Médailles Olympiques par Pays',
-    description: 'Statistiques des médailles depuis 1896 (été et hiver)'
-  }
-];
+// Removed AVAILABLE_DATASETS as we now upload files directly
 
 const CHART_TYPES = [
   { value: 'bar', label: '📊 Graphique en barres', icon: BarChart3 },
@@ -46,12 +41,15 @@ export default function StatsPage() {
 
   // État des modales
   const [modals, setModals] = useState({
-    register: false,
+    upload: false,
     createViz: false,
     viewViz: false,
   });
-  const [selectedLocalDataset, setSelectedLocalDataset] = useState(null);
   const [selectedViz, setSelectedViz] = useState(null);
+
+  // État pour l'upload
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadName, setUploadName] = useState('');
 
   // État du formulaire de visualisation
   const [vizForm, setVizForm] = useState({
@@ -119,13 +117,13 @@ export default function StatsPage() {
   const loadLocalCSV = async (filename) => {
     try {
       setLoading(true);
-      const response = await fetch(`/datasets/${filename}`);
+      const response = await fetch(`${BACKEND_BASE}/datasets/${filename}`);
       const csvText = await response.text();
 
       return new Promise((resolve) => {
         Papa.parse(csvText, {
           header: true,
-          delimiter: ';',
+          delimiter: ',',
           dynamicTyping: true,
           skipEmptyLines: true,
           complete: (results) => {
@@ -179,6 +177,54 @@ export default function StatsPage() {
     const sample = data.slice(0, 10).map(row => row[columnName]);
     const hasNumbers = sample.some(val => !isNaN(val) && val !== null && val !== '');
     return hasNumbers ? 'numeric' : 'categorical';
+  };
+
+  // ========== UPLOAD DATASET ==========
+  const handleUploadDataset = async () => {
+    if (!uploadFile || !uploadName.trim()) {
+      alert('Veuillez sélectionner un fichier et saisir un nom');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('name', uploadName.trim());
+
+      const response = await fetch(`${API_BASE}/datasets/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de l\'upload');
+      }
+
+      const data = await response.json();
+      console.log('✅ Dataset uploadé:', data);
+
+      closeModal('upload');
+      setUploadFile(null);
+      setUploadName('');
+      loadDatasetsFromDB();
+      alert('✅ Dataset uploadé avec succès !');
+    } catch (error) {
+      console.error('Erreur upload:', error);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de l\'upload du fichier'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ========== ENREGISTREMENT DATASET ==========
@@ -605,11 +651,11 @@ export default function StatsPage() {
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
         <button
           style={styles.buttonPrimary}
-          onClick={() => openModal('register')}
+          onClick={() => openModal('upload')}
           onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
           onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
         >
-          <Upload size={20} /> Enregistrer un CSV
+          <Upload size={20} /> Uploader un CSV
         </button>
         <button
           style={styles.buttonSuccess}
@@ -641,8 +687,8 @@ export default function StatsPage() {
           <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px' }}>
             Commencez par enregistrer un fichier CSV depuis public/datasets/
           </p>
-          <button style={styles.buttonPrimary} onClick={() => openModal('register')}>
-            <Upload size={20} /> Enregistrer votre premier CSV
+          <button style={styles.buttonPrimary} onClick={() => openModal('upload')}>
+            <Upload size={20} /> Uploader votre premier CSV
           </button>
         </div>
       ) : (
@@ -734,17 +780,17 @@ export default function StatsPage() {
     );
   };
 
-  // Modale d'enregistrement
-  const RegisterModal = () => {
-    if (!modals.register) return null;
+  // Modale d'upload
+  const UploadModal = () => {
+    if (!modals.upload) return null;
 
     return (
-      <div style={styles.modal} onClick={() => closeModal('register')}>
+      <div style={styles.modal} onClick={() => closeModal('upload')}>
         <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
           <div style={styles.modalHeader}>
-            <h2 style={styles.modalTitle}>📤 Enregistrer un CSV local</h2>
+            <h2 style={styles.modalTitle}>📤 Uploader un CSV</h2>
             <button
-              onClick={() => closeModal('register')}
+              onClick={() => closeModal('upload')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
             >
               <X size={28} color="#718096" />
@@ -752,46 +798,48 @@ export default function StatsPage() {
           </div>
 
           <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px', lineHeight: '1.6' }}>
-            Sélectionnez un fichier CSV disponible dans{' '}
+            Sélectionnez un fichier CSV à uploader. Le fichier sera stocké dans{' '}
             <code style={{ backgroundColor: '#f7fafc', padding: '2px 6px', borderRadius: '4px', fontSize: '13px' }}>
               public/datasets/
             </code>
           </p>
 
-          <label style={styles.label}>Fichier CSV disponible</label>
-          <select
-            style={styles.select}
-            value={selectedLocalDataset?.filename || ''}
-            onChange={(e) => {
-              const selected = AVAILABLE_DATASETS.find(d => d.filename === e.target.value);
-              setSelectedLocalDataset(selected);
-            }}
-          >
-            <option value="">Sélectionner un fichier</option>
-            {AVAILABLE_DATASETS.map(dataset => (
-              <option key={dataset.filename} value={dataset.filename}>
-                {dataset.name} ({dataset.filename})
-              </option>
-            ))}
-          </select>
+          <label style={styles.label}>Nom du dataset</label>
+          <input
+            type="text"
+            style={styles.input}
+            placeholder="Ex: Médailles Olympiques"
+            value={uploadName}
+            onChange={(e) => setUploadName(e.target.value)}
+            onFocus={(e) => e.target.style.borderColor = '#0085C7'}
+            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+          />
 
-          {selectedLocalDataset && (
+          <label style={styles.label}>Fichier CSV</label>
+          <input
+            type="file"
+            accept=".csv"
+            style={styles.input}
+            onChange={(e) => setUploadFile(e.target.files[0])}
+          />
+
+          {uploadFile && (
             <div style={styles.infoBox}>
               <p style={{ fontSize: '15px', color: '#2d3748', margin: '0 0 8px 0', fontWeight: '600' }}>
-                📄 {selectedLocalDataset.name}
+                📄 {uploadFile.name}
               </p>
               <p style={{ fontSize: '14px', color: '#718096', margin: 0 }}>
-                {selectedLocalDataset.description}
+                Taille: {(uploadFile.size / 1024).toFixed(1)} KB
               </p>
             </div>
           )}
 
           <button
-            onClick={handleRegisterDataset}
+            onClick={handleUploadDataset}
             style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '8px' }}
-            disabled={loading || !selectedLocalDataset}
+            disabled={loading || !uploadFile || !uploadName.trim()}
           >
-            {loading ? '⏳ Enregistrement...' : '✅ Enregistrer dans la BDD'}
+            {loading ? '⏳ Upload...' : '✅ Uploader le CSV'}
           </button>
         </div>
       </div>
@@ -914,7 +962,7 @@ export default function StatsPage() {
     );
   };
 
-      {showViewVizModal && selectedViz && csvData.length > 0 && (
+      {ViewVizModal && selectedViz && csvData.length > 0 && (
         <div style={styles.modal} onClick={() => setShowViewVizModal(false)}>
           <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -951,5 +999,22 @@ export default function StatsPage() {
         title={popup.title}
         message={popup.message}
       />
-  
+
+  return (
+    <div style={styles.container}>
+      <Header />
+      <DatasetsList />
+      <VisualizationsSection />
+      <UploadModal />
+      <CreateVizModal />
+      <ViewVizModal />
+      <Popup
+        isOpen={popup.isOpen}
+        onClose={() => setPopup({ ...popup, isOpen: false })}
+        type={popup.type}
+        title={popup.title}
+        message={popup.message}
+      />
+    </div>
+  );
 }

@@ -14,7 +14,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
     operations: [
         new Get(),
         new GetCollection(),
-        new Post(security: "is_granted('ROLE_DATA_PROVIDER')"),
+        new Post(security: "is_granted('ROLE_USER')"),
         new Put(security: "object.getUploadedBy() == user or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"),
         new Delete(security: "is_granted('ROLE_ADMIN')")
     ],
