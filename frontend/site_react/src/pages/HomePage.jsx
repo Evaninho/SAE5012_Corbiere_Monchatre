@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Trophy, BarChart3, Newspaper, Play } from "lucide-react";
-import Fondimg from "../components/image/fondAccueil.webp";
+import Fondimg from "../components/image/JO OLYMPEAK.png";
 import CarrefourLogo from "../../public/images/Carrefour.svg";
 import EDFLogo from "../../public/images/Edf.png";
 import AllianzLogo from "../../public/images/Allianz.png";

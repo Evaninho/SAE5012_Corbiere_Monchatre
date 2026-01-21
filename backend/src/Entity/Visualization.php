@@ -13,7 +13,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
         new GetCollection(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
         new Post(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
         new Put(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
-        new Delete(security: "is_granted('ROLE_ADMIN')")
+        new Delete(name: 'delete', security: "is_granted('ROLE_DATA_PROVIDER') or is_granted('ROLE_ADMIN')")
     ],
     normalizationContext: ['groups' => ['visualization:read']],
     denormalizationContext: ['groups' => ['visualization:write']]

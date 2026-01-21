@@ -6,6 +6,16 @@ api_platform:
         cache_headers:
             vary: ['Content-Type', 'Authorization', 'Origin']
     
+    formats:
+        jsonld:
+            mime_types: ['application/ld+json']
+        json:
+            mime_types: ['application/json']
+        html:
+            mime_types: ['text/html']
+        csv:
+            mime_types: ['text/csv']
+    
     swagger:
         api_keys:
             JWT:

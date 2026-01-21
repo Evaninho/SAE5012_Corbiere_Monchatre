@@ -7,6 +7,7 @@ import {
 import { Upload, BarChart3, TrendingUp, Plus, X, RefreshCw, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 import { Popup } from '../components/Popup';
+import { usePermissions } from '../hooks/usePermissions';
 
 // ============ CONSTANTES ============
 const API_BASE = 'http://localhost:8000/api';
@@ -30,7 +31,7 @@ export default function StatsPage() {
   const [csvData, setCsvData] = useState([]);
   const [csvHeaders, setCsvHeaders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [user] = useState({ role: 'ROLE_DATA_PROVIDER' });
+  const { userRole } = usePermissions(); // Récupérer le rôle utilisateur
   const [popup, setPopup] = useState({
     isOpen: false,
     type: 'info',
@@ -62,6 +63,11 @@ export default function StatsPage() {
   // États pour les contrôles de visualisation
   const [chartRowsLimit, setChartRowsLimit] = useState(15);
   const [chartSortOrder, setChartSortOrder] = useState('none');
+
+  // État pour le format CSV
+  const [csvFormat, setCsvFormat] = useState(null); // 'yearly' ou 'historical'
+  const [availableYears, setAvailableYears] = useState([]);
+  const [selectedYear, setSelectedYear] = useState(null);
 
   // ========== UTILITAIRES D'AUTHENTIFICATION ==========
   const getToken = () => localStorage.getItem('authToken');
@@ -193,6 +199,10 @@ export default function StatsPage() {
             setCsvData(trimmedData);
             const trimmedFields = (results.meta.fields || []).map(f => f.trim());
             setCsvHeaders(trimmedFields);
+            
+            // Détecter le format du CSV
+            detectCSVFormat(trimmedData, trimmedFields);
+            
             console.log(`📊 Données parsées: ${trimmedData.length} lignes, ${trimmedFields.length} colonnes`, trimmedFields);
             resolve({ data: trimmedData, headers: trimmedFields });
           },
@@ -251,6 +261,25 @@ export default function StatsPage() {
     const sample = data.slice(0, 10).map(row => row[columnName]);
     const hasNumbers = sample.some(val => !isNaN(val) && val !== null && val !== '');
     return hasNumbers ? 'numeric' : 'categorical';
+  };
+
+  // Détecte le format du CSV (avec Year ou sans)
+  const detectCSVFormat = (data, headers) => {
+    const hasYear = headers.some(h => h.trim().toLowerCase() === 'year');
+    if (hasYear) {
+      // Extraire les années uniques et les trier
+      const years = [...new Set(data.map(row => row['Year'] || row[' Year']).filter(y => y))]
+        .sort((a, b) => b - a);
+      setAvailableYears(years);
+      setSelectedYear(years[0]); // Sélectionner la plus récente par défaut
+      setCsvFormat('yearly');
+      return 'yearly';
+    } else {
+      setAvailableYears([]);
+      setSelectedYear(null);
+      setCsvFormat('historical');
+      return 'historical';
+    }
   };
 
   // ========== UPLOAD DATASET ==========
@@ -418,13 +447,26 @@ export default function StatsPage() {
   };
 
   const handleDeleteVisualization = async (vizId) => {
+    // Vérifier les permissions
+    if (userRole !== 'ROLE_DATA_PROVIDER' && userRole !== 'ROLE_ADMIN') {
+      alert('❌ Vous n\'avez pas la permission de supprimer une visualisation');
+      return;
+    }
+
     if (!window.confirm('⚠️ Êtes-vous sûr de vouloir supprimer cette visualisation ?')) {
       return;
     }
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/visualizations/${vizId}`, {
+      
+      // Extraire l'ID numérique si c'est au format IRI
+      const numericId = typeof vizId === 'string' && vizId.includes('/') ? vizId.split('/').pop() : vizId;
+      const deleteUrl = `${API_BASE}/visualizations/${numericId}`;
+      
+      console.log('🗑️ Suppression de la visualisation:', { vizId, numericId, deleteUrl });
+      
+      const response = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -432,7 +474,11 @@ export default function StatsPage() {
       if (!response.ok) throw new Error('Erreur suppression');
 
       closeModal('viewViz');
-      loadVisualizations(selectedDataset.id);
+      setSelectedViz(null);
+      
+      // Recharger les visualisations pour mettre à jour la liste
+      await loadVisualizations(selectedDataset.id);
+      
       alert('✅ Visualisation supprimée');
     } catch (error) {
       console.error('❌ Erreur:', error);
@@ -457,9 +503,19 @@ export default function StatsPage() {
       return trimmedKey ? row[trimmedKey] : null;
     };
     
+    // Filtrer par année si le CSV est au format 'yearly'
+    let filteredData = data;
+    if (csvFormat === 'yearly' && selectedYear) {
+      filteredData = data.filter(row => {
+        const rowYear = getDataValue(row, 'Year');
+        return rowYear === selectedYear || rowYear === String(selectedYear);
+      });
+      console.log(`🎯 Données filtrées pour l'année ${selectedYear}: ${filteredData.length} lignes`);
+    }
+    
     // Mapper les données avec validation et trim des clés
     // Important: on traite TOUTES les données d'abord, puis on trie, puis on limite
-    let chartData = data.map(row => {
+    let chartData = filteredData.map(row => {
       const xValue = String(getDataValue(row, config.xAxis) || '').substring(0, 25).trim();
       const yValue = parseFloat(getDataValue(row, config.yAxis)) || 0;
       return {
@@ -845,435 +901,14 @@ export default function StatsPage() {
 
   // ========== COMPOSANTS DE L'INTERFACE ==========
 
-  // Header principal
-  const Header = () => (
-    <div style={styles.header}>
-      <h1 style={styles.title}>📊 Visualisation de Données JO</h1>
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-        <button
-          style={styles.buttonPrimary}
-          onClick={() => openModal('upload')}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          <Upload size={20} /> Uploader un CSV
-        </button>
-        <button
-          style={styles.buttonSuccess}
-          onClick={loadDatasetsFromDB}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#229954'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#27ae60'}
-        >
-          <RefreshCw size={20} /> Actualiser
-        </button>
-      </div>
-    </div>
-  );
-
-  // Liste des datasets
-  const DatasetsList = () => (
-    <div>
-      <h2 style={styles.sectionTitle}>📁 Datasets enregistrés ({datasets.length})</h2>
-      {loading && datasets.length === 0 ? (
-        <div style={styles.loadingState}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <p style={{ fontSize: '16px' }}>Chargement des datasets...</p>
-        </div>
-      ) : datasets.length === 0 ? (
-        <div style={styles.emptyState}>
-          <div style={{ fontSize: '64px', marginBottom: '20px' }}>📦</div>
-          <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
-            Aucun dataset enregistré
-          </p>
-          <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px' }}>
-            Vérifiez que vous êtes connecté et que des datasets existent en base de données.
-          </p>
-          <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#edf2f7', borderRadius: '8px', borderLeft: '4px solid #4299e1' }}>
-            <p style={{ fontSize: '12px', color: '#2d3748', margin: 0 }}>
-              💡 Ouvrez la console (F12) pour voir les messages de debug
-            </p>
-          </div>
-          <button 
-            style={styles.buttonPrimary} 
-            onClick={() => {
-              console.log('🔄 Rechargement manuel des datasets...');
-              loadDatasetsFromDB();
-            }}
-          >
-            🔄 Recharger les datasets
-          </button>
-          <button style={{ ...styles.buttonPrimary, marginLeft: '10px', backgroundColor: '#48bb78' }} onClick={() => openModal('upload')}>
-            <Upload size={20} /> Uploader un CSV
-          </button>
-        </div>
-      ) : (
-        <div style={styles.grid}>
-          {datasets.map(dataset => (
-            <div
-              key={dataset.id}
-              style={styles.card}
-              onClick={() => handleSelectDataset(dataset)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-              }}
-            >
-              <h3 style={styles.cardTitle}>{dataset.name}</h3>
-              <p style={styles.cardText}>📄 {dataset.path.split('/').pop()}</p>
-              <p style={styles.cardText}>📊 {dataset.datasetVariables?.length || 0} variables</p>
-              <p style={styles.cardText}>📈 {dataset.visualizations?.length || 0} visualisations</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  // Section des visualisations
-  const VisualizationsSection = () => {
-    if (!selectedDataset) return null;
-
-    const vizList = selectedDataset.visualizations || [];
-
-    return (
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-          <h2 style={styles.sectionTitle}>📈 Visualisations - {selectedDataset.name}</h2>
-          <button
-            style={styles.buttonPrimary}
-            onClick={() => openModal('createViz')}
-          >
-            <Plus size={20} /> Créer une visualisation
-          </button>
-        </div>
-
-        {vizList.length === 0 ? (
-          <div style={styles.emptyState}>
-            <div style={{ fontSize: '64px', marginBottom: '20px' }}>📊</div>
-            <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
-              Aucune visualisation créée
-            </p>
-            <button style={styles.buttonPrimary} onClick={() => openModal('createViz')}>
-              <Plus size={20} /> Créer la première visualisation
-            </button>
-          </div>
-        ) : (
-          <div style={styles.grid}>
-            {vizList.map(viz => (
-              <div
-                key={viz.id}
-                style={styles.card}
-                onClick={() => {
-                  setSelectedViz(viz);
-                  openModal('viewViz');
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                }}
-              >
-                <div style={styles.cardTitle}>
-                  {viz.chartType === 'bar' && <BarChart3 size={24} />}
-                  {viz.chartType === 'line' && <TrendingUp size={24} />}
-                  {viz.config.title || `Graphique ${viz.chartType}`}
-                </div>
-                <p style={styles.cardText}>
-                  📊 Type: {CHART_TYPES.find(ct => ct.value === viz.chartType)?.label.split(' ').pop()}
-                </p>
-                <p style={styles.cardText}>📍 Variables: {viz.config.xAxis} / {viz.config.yAxis}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Modale d'upload
-  const UploadModal = () => {
-    if (!modals.upload) return null;
-
-    return (
-      <div style={styles.modal} onClick={() => closeModal('upload')}>
-        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-          <div style={styles.modalHeader}>
-            <h2 style={styles.modalTitle}>📤 Uploader un CSV</h2>
-            <button
-              onClick={() => closeModal('upload')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-            >
-              <X size={28} color="#718096" />
-            </button>
-          </div>
-
-          <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px', lineHeight: '1.6' }}>
-            Sélectionnez un fichier CSV à uploader. Le fichier sera stocké dans{' '}
-            <code style={{ backgroundColor: '#f7fafc', padding: '2px 6px', borderRadius: '4px', fontSize: '13px' }}>
-              public/datasets/
-            </code>
-          </p>
-
-          <label style={styles.label}>Nom du dataset</label>
-          <input
-            type="text"
-            style={styles.input}
-            placeholder="Ex: Médailles Olympiques"
-            value={uploadName}
-            onChange={(e) => setUploadName(e.target.value)}
-            onFocus={(e) => e.target.style.borderColor = '#0085C7'}
-            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-          />
-
-          <label style={styles.label}>Fichier CSV</label>
-          <input
-            type="file"
-            accept=".csv"
-            style={styles.input}
-            onChange={(e) => setUploadFile(e.target.files[0])}
-          />
-
-          {uploadFile && (
-            <div style={styles.infoBox}>
-              <p style={{ fontSize: '15px', color: '#2d3748', margin: '0 0 8px 0', fontWeight: '600' }}>
-                📄 {uploadFile.name}
-              </p>
-              <p style={{ fontSize: '14px', color: '#718096', margin: 0 }}>
-                Taille: {(uploadFile.size / 1024).toFixed(1)} KB
-              </p>
-            </div>
-          )}
-
-          <button
-            onClick={handleUploadDataset}
-            style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '8px' }}
-            disabled={loading || !uploadFile || !uploadName.trim()}
-          >
-            {loading ? '⏳ Upload...' : '✅ Uploader le CSV'}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Modale de création de visualisation
-  const CreateVizModal = () => {
-    if (!modals.createViz || !selectedDataset) return null;
-
-    return (
-      <div style={styles.modal} onClick={() => closeModal('createViz')}>
-        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-          <div style={styles.modalHeader}>
-            <h2 style={styles.modalTitle}>📊 Créer une visualisation</h2>
-            <button
-              onClick={() => closeModal('createViz')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-            >
-              <X size={28} color="#718096" />
-            </button>
-          </div>
-
-          <label style={styles.label}>Titre de la visualisation</label>
-          <input
-            type="text"
-            style={styles.input}
-            placeholder="Ex: Médailles d'or par pays"
-            value={vizForm.title}
-            onChange={(e) => setVizForm({ ...vizForm, title: e.target.value })}
-            onFocus={(e) => e.target.style.borderColor = '#0085C7'}
-            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-          />
-
-          <label style={styles.label}>Type de graphique</label>
-          <select
-            style={styles.select}
-            value={vizForm.chartType}
-            onChange={(e) => setVizForm({ ...vizForm, chartType: e.target.value })}
-          >
-            {CHART_TYPES.map(ct => (
-              <option key={ct.value} value={ct.value}>
-                {ct.label}
-              </option>
-            ))}
-          </select>
-
-          <label style={styles.label}>Variable X (axe horizontal / catégorie)</label>
-          <select
-            style={styles.select}
-            value={vizForm.xAxis}
-            onChange={(e) => setVizForm({ ...vizForm, xAxis: e.target.value })}
-          >
-            <option value="">Sélectionner une variable</option>
-            {selectedDataset.datasetVariables?.map(variable => (
-              <option key={variable.id} value={variable.name}>
-                {variable.name} ({variable.type})
-              </option>
-            ))}
-          </select>
-
-          <label style={styles.label}>Variable Y (axe vertical / valeur numérique)</label>
-          <select
-            style={styles.select}
-            value={vizForm.yAxis}
-            onChange={(e) => setVizForm({ ...vizForm, yAxis: e.target.value })}
-          >
-            <option value="">Sélectionner une variable</option>
-            {selectedDataset.datasetVariables?.filter(v => v.type === 'numeric').map(variable => (
-              <option key={variable.id} value={variable.name}>
-                {variable.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            onClick={handleCreateVisualization}
-            style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '16px' }}
-            disabled={!vizForm.xAxis || !vizForm.yAxis || loading}
-          >
-            {loading ? '⏳ Création...' : '✅ Créer la visualisation'}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Modale de visualisation
-  const ViewVizModal = () => {
-    if (!modals.viewViz || !selectedViz) return null;
-
-    return (
-      <div style={styles.modal} onClick={() => closeModal('viewViz')}>
-        <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
-          <div style={styles.modalHeader}>
-            <h2 style={styles.modalTitle}>{selectedViz.config?.title || 'Visualisation'}</h2>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => handleDeleteVisualization(selectedViz.id)}
-                style={{ ...styles.buttonPrimary, backgroundColor: '#e53e3e', padding: '8px 12px' }}
-              >
-                <Trash2 size={18} />
-              </button>
-              <button
-                onClick={() => closeModal('viewViz')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <X size={28} color="#718096" />
-              </button>
-            </div>
-          </div>
-
-          {/* Contrôles pour l'affichage du graphique */}
-          <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', padding: '16px', backgroundColor: '#f7fafc', borderRadius: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div>
-              <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
-                📊 Nombre de lignes:
-              </label>
-              <select
-                value={chartRowsLimit}
-                onChange={(e) => setChartRowsLimit(parseInt(e.target.value))}
-                style={{
-                  padding: '8px 12px',
-                  border: '2px solid #cbd5e0',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value={15}>Top 15</option>
-                <option value={30}>Top 30</option>
-                <option value={50}>Top 50</option>
-                <option value={100}>Top 100</option>
-                <option value={9999}>Toutes les données ({csvData.length})</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
-                📈 Tri:
-              </label>
-              <select
-                value={chartSortOrder}
-                onChange={(e) => setChartSortOrder(e.target.value)}
-                style={{
-                  padding: '8px 12px',
-                  border: '2px solid #cbd5e0',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="none">Aucun tri</option>
-                <option value="asc">Croissant ↑</option>
-                <option value="desc">Décroissant ↓</option>
-              </select>
-            </div>
-          </div>
-
-          {csvData.length === 0 ? (
-            <p style={{ textAlign: 'center', color: '#718096' }}>Aucune donnée chargée</p>
-          ) : (
-            renderChart(selectedViz, csvData)
-          )}
-        </div>
-      </div>
-    );
-  };
-
-      {ViewVizModal && selectedViz && csvData.length > 0 && (
-        <div style={styles.modal} onClick={() => setShowViewVizModal(false)}>
-          <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>
-                {selectedViz.config.title || 'Visualisation'}
-              </h2>
-              <button onClick={() => setShowViewVizModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            {renderChart(selectedViz, csvData)}
-
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Type:</strong> {selectedViz.chartType}
-              </p>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Variable X:</strong> {selectedViz.config.xAxis}
-              </p>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Variable Y:</strong> {selectedViz.config.yAxis}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP */}
-      <Popup
-        isOpen={popup.isOpen}
-        onClose={() => setPopup({ ...popup, isOpen: false })}
-        type={popup.type}
-        title={popup.title}
-        message={popup.message}
-      />
-
   return (
     <div style={styles.container}>
-      <Header />
-      <DatasetsList />
-      <VisualizationsSection />
-      <UploadModal />
-      <CreateVizModal />
-      <ViewVizModal />
+      <Header_Component styles={styles} userRole={userRole} openModal={openModal} loadDatasetsFromDB={loadDatasetsFromDB} />
+      <DatasetsList_Component styles={styles} datasets={datasets} loading={loading} handleSelectDataset={handleSelectDataset} userRole={userRole} openModal={openModal} />
+      <VisualizationsSection_Component styles={styles} selectedDataset={selectedDataset} vizList={selectedDataset?.visualizations || []} openModal={openModal} CHART_TYPES={CHART_TYPES} setSelectedViz={setSelectedViz} />
+      <UploadModal_Component styles={styles} modals={modals} closeModal={closeModal} uploadName={uploadName} setUploadName={setUploadName} uploadFile={uploadFile} setUploadFile={setUploadFile} loading={loading} handleUploadDataset={handleUploadDataset} />
+      <CreateVizModal_Component styles={styles} modals={modals} closeModal={closeModal} selectedDataset={selectedDataset} vizForm={vizForm} setVizForm={setVizForm} CHART_TYPES={CHART_TYPES} loading={loading} handleCreateVisualization={handleCreateVisualization} COLORS={COLORS} />
+      <ViewVizModal_Component styles={styles} modals={modals} closeModal={closeModal} selectedViz={selectedViz} userRole={userRole} handleDeleteVisualization={handleDeleteVisualization} csvFormat={csvFormat} availableYears={availableYears} selectedYear={selectedYear} setSelectedYear={setSelectedYear} chartRowsLimit={chartRowsLimit} setChartRowsLimit={setChartRowsLimit} chartSortOrder={chartSortOrder} setChartSortOrder={setChartSortOrder} csvData={csvData} renderChart={renderChart} />
       <Popup
         isOpen={popup.isOpen}
         onClose={() => setPopup({ ...popup, isOpen: false })}
@@ -1284,3 +919,410 @@ export default function StatsPage() {
     </div>
   );
 }
+
+// ========== COMPOSANTS EXTRAITS (en dehors du composant principal) ==========
+
+// Header principal
+const Header_Component = ({ styles, userRole, openModal, loadDatasetsFromDB }) => (
+  <div style={styles.header}>
+    <h1 style={styles.title}>📊 Visualisation de Données JO</h1>
+    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      {userRole === 'ROLE_DATA_PROVIDER' && (
+        <button
+          style={styles.buttonPrimary}
+          onClick={() => openModal('upload')}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <Upload size={20} /> Uploader un CSV
+        </button>
+      )}
+      <button
+        style={styles.buttonSuccess}
+        onClick={loadDatasetsFromDB}
+        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#229954'}
+        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#27ae60'}
+      >
+        <RefreshCw size={20} /> Actualiser
+      </button>
+    </div>
+  </div>
+);
+
+// Liste des datasets
+const DatasetsList_Component = ({ styles, datasets, loading, handleSelectDataset, userRole, openModal }) => (
+  <div>
+    <h2 style={styles.sectionTitle}>📁 Datasets enregistrés ({datasets.length})</h2>
+    {loading && datasets.length === 0 ? (
+      <div style={styles.loadingState}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+        <p style={{ fontSize: '16px' }}>Chargement des datasets...</p>
+      </div>
+    ) : datasets.length === 0 ? (
+      <div style={styles.emptyState}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📦</div>
+        <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
+          Aucun dataset enregistré
+        </p>
+        <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px' }}>
+          Vérifiez que vous êtes connecté et que des datasets existent en base de données.
+        </p>
+        <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#edf2f7', borderRadius: '8px', borderLeft: '4px solid #4299e1' }}>
+          <p style={{ fontSize: '12px', color: '#2d3748', margin: 0 }}>
+            💡 Ouvrez la console (F12) pour voir les messages de debug
+          </p>
+        </div>
+        <button 
+          style={styles.buttonPrimary} 
+          onClick={() => {
+            console.log('🔄 Rechargement manuel des datasets...');
+            loadDatasetsFromDB();
+          }}
+        >
+          🔄 Recharger les datasets
+        </button>
+        {userRole === 'ROLE_DATA_PROVIDER' && (
+          <button style={{ ...styles.buttonPrimary, marginLeft: '10px', backgroundColor: '#48bb78' }} onClick={() => openModal('upload')}>
+            <Upload size={20} /> Uploader un CSV
+          </button>
+        )}
+      </div>
+    ) : (
+      <div style={styles.grid}>
+        {datasets.map(dataset => (
+          <div
+            key={dataset.id}
+            style={styles.card}
+            onClick={() => handleSelectDataset(dataset)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            }}
+          >
+            <h3 style={styles.cardTitle}>{dataset.name}</h3>
+            <p style={styles.cardText}>📄 {dataset.path.split('/').pop()}</p>
+            <p style={styles.cardText}>📊 {dataset.datasetVariables?.length || 0} variables</p>
+            <p style={styles.cardText}>📈 {dataset.visualizations?.length || 0} visualisations</p>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+// Section des visualisations
+const VisualizationsSection_Component = ({ styles, selectedDataset, vizList, openModal, CHART_TYPES, setSelectedViz }) => {
+  if (!selectedDataset) return null;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <h2 style={styles.sectionTitle}>📈 Visualisations - {selectedDataset.name}</h2>
+        <button
+          style={styles.buttonPrimary}
+          onClick={() => openModal('createViz')}
+        >
+          <Plus size={20} /> Créer une visualisation
+        </button>
+      </div>
+
+      {vizList.length === 0 ? (
+        <div style={styles.emptyState}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>📊</div>
+          <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
+            Aucune visualisation créée
+          </p>
+          <button style={styles.buttonPrimary} onClick={() => openModal('createViz')}>
+            <Plus size={20} /> Créer la première visualisation
+          </button>
+        </div>
+      ) : (
+        <div style={styles.grid}>
+          {vizList.map(viz => (
+            <div
+              key={viz.id}
+              style={styles.card}
+              onClick={() => {
+                setSelectedViz(viz);
+                openModal('viewViz');
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+              }}
+            >
+              <div style={styles.cardTitle}>
+                {viz.chartType === 'bar' && <BarChart3 size={24} />}
+                {viz.chartType === 'line' && <TrendingUp size={24} />}
+                {viz.config.title || `Graphique ${viz.chartType}`}
+              </div>
+              <p style={styles.cardText}>
+                📊 Type: {CHART_TYPES.find(ct => ct.value === viz.chartType)?.label.split(' ').pop()}
+              </p>
+              <p style={styles.cardText}>📍 Variables: {viz.config.xAxis} / {viz.config.yAxis}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+  // Modale d'upload
+  const UploadModal_Component = ({ styles, modals, closeModal, uploadName, setUploadName, uploadFile, setUploadFile, loading, handleUploadDataset }) => {
+  if (!modals.upload) return null;
+
+  return (
+    <div style={styles.modal} onClick={() => closeModal('upload')}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>📤 Uploader un CSV</h2>
+          <button
+            onClick={() => closeModal('upload')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+          >
+            <X size={28} color="#718096" />
+          </button>
+        </div>
+
+        <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px', lineHeight: '1.6' }}>
+          Sélectionnez un fichier CSV à uploader. Le fichier sera stocké dans{' '}
+          <code style={{ backgroundColor: '#f7fafc', padding: '2px 6px', borderRadius: '4px', fontSize: '13px' }}>
+            public/datasets/
+          </code>
+        </p>
+
+        <label style={styles.label}>Nom du dataset</label>
+        <input
+          type="text"
+          style={styles.input}
+          placeholder="Ex: Médailles Olympiques"
+          value={uploadName}
+          onChange={(e) => setUploadName(e.target.value)}
+        />
+
+        <label style={styles.label}>Fichier CSV</label>
+        <input
+          type="file"
+          accept=".csv"
+          style={styles.input}
+          onChange={(e) => setUploadFile(e.target.files[0])}
+        />
+
+        {uploadFile && (
+          <div style={styles.infoBox}>
+            <p style={{ fontSize: '15px', color: '#2d3748', margin: '0 0 8px 0', fontWeight: '600' }}>
+              📄 {uploadFile.name}
+            </p>
+            <p style={{ fontSize: '14px', color: '#718096', margin: 0 }}>
+              Taille: {(uploadFile.size / 1024).toFixed(1)} KB
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={handleUploadDataset}
+          style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '8px' }}
+          disabled={loading || !uploadFile || !uploadName.trim()}
+        >
+          {loading ? '⏳ Upload...' : '✅ Uploader le CSV'}
+        </button>
+      </div>
+    </div>
+  );
+};
+const CreateVizModal_Component = ({ styles, modals, closeModal, selectedDataset, vizForm, setVizForm, CHART_TYPES, loading, handleCreateVisualization, COLORS }) => (
+  modals.createViz && selectedDataset ? (
+    <div style={styles.modal} onClick={() => closeModal('createViz')}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>📊 Créer une visualisation</h2>
+          <button
+            onClick={() => closeModal('createViz')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+          >
+            <X size={28} color="#718096" />
+          </button>
+        </div>
+
+        <label style={styles.label}>Titre de la visualisation</label>
+        <input
+          type="text"
+          style={styles.input}
+          placeholder="Ex: Médailles d'or par pays"
+          value={vizForm.title}
+          onChange={(e) => setVizForm({ ...vizForm, title: e.target.value })}
+        />
+
+        <label style={styles.label}>Type de graphique</label>
+        <select
+          style={styles.select}
+          value={vizForm.chartType}
+          onChange={(e) => setVizForm({ ...vizForm, chartType: e.target.value })}
+        >
+          {CHART_TYPES.map(ct => (
+            <option key={ct.value} value={ct.value}>
+              {ct.label}
+            </option>
+          ))}
+        </select>
+
+        <label style={styles.label}>Variable X (axe horizontal / catégorie)</label>
+        <select
+          style={styles.select}
+          value={vizForm.xAxis}
+          onChange={(e) => setVizForm({ ...vizForm, xAxis: e.target.value })}
+        >
+          <option value="">Sélectionner une variable</option>
+          {selectedDataset.datasetVariables?.map(variable => (
+            <option key={variable.id} value={variable.name}>
+              {variable.name} ({variable.type})
+            </option>
+          ))}
+        </select>
+
+        <label style={styles.label}>Variable Y (axe vertical / valeur numérique)</label>
+        <select
+          style={styles.select}
+          value={vizForm.yAxis}
+          onChange={(e) => setVizForm({ ...vizForm, yAxis: e.target.value })}
+        >
+          <option value="">Sélectionner une variable</option>
+          {selectedDataset.datasetVariables?.filter(v => v.type === 'numeric').map(variable => (
+            <option key={variable.id} value={variable.name}>
+              {variable.name}
+            </option>
+          ))}
+        </select>
+
+        <button
+          onClick={handleCreateVisualization}
+          style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '16px' }}
+          disabled={!vizForm.xAxis || !vizForm.yAxis || loading}
+        >
+          {loading ? '⏳ Création...' : '✅ Créer la visualisation'}
+        </button>
+      </div>
+    </div>
+  ) : null
+);
+
+// Modale de visualisation
+const ViewVizModal_Component = ({ styles, modals, closeModal, selectedViz, userRole, handleDeleteVisualization, csvFormat, availableYears, selectedYear, setSelectedYear, chartRowsLimit, setChartRowsLimit, chartSortOrder, setChartSortOrder, csvData, renderChart }) => {
+  if (!modals.viewViz || !selectedViz) return null;
+
+  return (
+    <div style={styles.modal} onClick={() => closeModal('viewViz')}>
+      <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>{selectedViz.config?.title || 'Visualisation'}</h2>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {(userRole === 'ROLE_DATA_PROVIDER' || userRole === 'ROLE_ADMIN') && (
+              <button
+                onClick={() => handleDeleteVisualization(selectedViz.id)}
+                style={{ ...styles.buttonPrimary, backgroundColor: '#e53e3e', padding: '8px 12px' }}
+                title="Supprimer cette visualisation"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            <button
+              onClick={() => closeModal('viewViz')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={28} color="#718096" />
+            </button>
+          </div>
+        </div>
+
+        {/* Contrôles pour l'affichage du graphique */}
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', padding: '16px', backgroundColor: '#f7fafc', borderRadius: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Filtre d'année si applicable */}
+          {csvFormat === 'yearly' && availableYears.length > 0 && (
+            <div>
+              <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+                📅 Année:
+              </label>
+              <select
+                value={selectedYear || ''}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                style={{
+                  padding: '8px 12px',
+                  border: '2px solid #cbd5e0',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          <div>
+            <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+              📊 Nombre de lignes:
+            </label>
+            <select
+              value={chartRowsLimit}
+              onChange={(e) => setChartRowsLimit(parseInt(e.target.value))}
+              style={{
+                padding: '8px 12px',
+                border: '2px solid #cbd5e0',
+                borderRadius: '6px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                backgroundColor: 'white'
+              }}
+            >
+              <option value={15}>Top 15</option>
+              <option value={30}>Top 30</option>
+              <option value={50}>Top 50</option>
+              <option value={100}>Top 100</option>
+              <option value={9999}>Toutes les données ({csvData.length})</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+              📈 Tri:
+            </label>
+            <select
+              value={chartSortOrder}
+              onChange={(e) => setChartSortOrder(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                border: '2px solid #cbd5e0',
+                borderRadius: '6px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                backgroundColor: 'white'
+              }}
+            >
+              <option value="none">Aucun tri</option>
+              <option value="asc">Croissant ↑</option>
+              <option value="desc">Décroissant ↓</option>
+            </select>
+          </div>
+        </div>
+
+        {csvData.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#718096' }}>Aucune donnée chargée</p>
+        ) : (
+          renderChart(selectedViz, csvData)
+        )}
+      </div>
+    </div>
+  );
+};
