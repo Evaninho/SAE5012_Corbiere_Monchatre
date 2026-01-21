@@ -181,7 +181,7 @@ export function ProfilePage() {
     try {
       setLoading(true);
       const storedData = localStorage.getItem('userData');
-    console.log(storedData);
+    // console.log(storedData);
 
 
       if (storedData) {

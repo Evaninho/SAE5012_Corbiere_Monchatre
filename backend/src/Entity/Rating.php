@@ -7,19 +7,24 @@ use App\State\RatingProcessor;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
-use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Put, Delete};
+use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Patch, Delete};
 
 #[ORM\Entity(repositoryClass: RatingRepository::class)]
 #[ApiResource(
     operations: [
         new Get(),
         new GetCollection(),
-        // new Post(
-        //     security: "is_granted('IS_AUTHENTICATED_FULLY')",
-        //     processor: RatingProcessor::class
-        // ),
-        new Post(security: "is_granted('ROLE_USER')"),
-        new Delete(security: "is_granted('ROLE_ADMIN')")
+        new Post(
+            security: "is_granted('ROLE_USER') or is_granted('ROLE_AUTHOR') or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')",
+            processor: RatingProcessor::class
+        ),
+        new Patch(
+            security: "object.getUser() == user",
+            processor: RatingProcessor::class
+        ),
+        new Delete(
+            security: "object.getUser() == user or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"
+        )
     ],
     normalizationContext: ['groups' => ['rating:read']],
     denormalizationContext: ['groups' => ['rating:write']]

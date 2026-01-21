@@ -3,6 +3,8 @@
 namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Rating;
 use App\Repository\RatingRepository;
@@ -31,22 +33,31 @@ class RatingProcessor implements ProcessorInterface
             throw new AccessDeniedHttpException('Utilisateur non authentifié');
         }
 
-        if (!$data->getArticle()) {
-            throw new BadRequestHttpException('Article manquant');
+        // ===== POST - Création d'un nouveau rating =====
+        if ($operation instanceof Post) {
+            if (!$data->getArticle()) {
+                throw new BadRequestHttpException('Article manquant');
+            }
+
+            // 🔒 1 commentaire par article par utilisateur
+            $existingRating = $this->ratingRepository->findOneBy([
+                'user' => $user,
+                'article' => $data->getArticle()
+            ]);
+
+            if ($existingRating) {
+                throw new BadRequestHttpException('Vous avez déjà commenté cet article');
+            }
+
+            $data->setUser($user);
+            $data->setCreatedAt(new \DateTimeImmutable());
         }
-
-        // 🔒 1 commentaire par article par utilisateur
-        $existingRating = $this->ratingRepository->findOneBy([
-            'user' => $user,
-            'article' => $data->getArticle()
-        ]);
-
-        if ($existingRating) {
-            throw new BadRequestHttpException('Vous avez déjà commenté cet article');
+        
+        // ===== PATCH - Modification d'un rating existant =====
+        if ($operation instanceof Patch) {
+            // La sécurité est vérifiée par API Platform (object.getUser() == user)
+            // On peut juste laisser passer
         }
-
-        $data->setUser($user);
-        $data->setCreatedAt(new \DateTimeImmutable());
 
         return $this->persistProcessor->process(
             $data,

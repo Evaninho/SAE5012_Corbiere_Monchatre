@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, Image as ImageIcon, Type, X, Upload, Folder } from "lucide-react";
 import { Popup } from "../components/Popup";
+import { ImageBlock } from "../components/common/ImageBlock";
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -465,9 +465,10 @@ export function CreateArticlePage() {
         message: 'Article créé avec succès'
       });
 
+      // Attendre que le popup se ferme avant de naviguer
       setTimeout(() => {
-        navigate(`/actualites/${data.id}`);
-      }, 1500);
+        navigate('/actualites');
+      }, 2000);
 
     } catch (error) {
       setPopup({
@@ -568,90 +569,17 @@ export function CreateArticlePage() {
 
               {/* Contenu IMAGE - DISPOSITION VERTICALE */}
               {block.type === 'image' && (
-                <div>
-                  {/* 3 OPTIONS EN COLONNE */}
-                  <div style={styles.imageOptionsContainer}>
-                    {/* Option 1: Upload */}
-                    <label
-                      style={styles.imageOptionButton}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#e0f2fe';
-                        e.currentTarget.style.borderColor = '#0085C7';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f9fafb';
-                        e.currentTarget.style.borderColor = '#D9D9D9';
-                      }}
-                    >
-                      <Upload size={20} color="#0085C7" />
-                      <span>Importer une image</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            handleImageUpload(block.id, e.target.files[0]);
-                          }
-                        }}
-                        style={{ display: 'none' }}
-                      />
-                    </label>
-
-                    {/* Option 2: URL */}
-                    <div style={{ marginTop: '10px' }}>
-                      <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
-                        Ou coller l'URL de l'image
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="https://exemple.com/image.jpg"
-                        value={block.content.url || ''}
-                        onChange={(e) => updateBlockContent(block.id, { url: e.target.value })}
-                        style={styles.input}
-                        onFocus={(e) => e.target.style.borderColor = '#0085C7'}
-                        onBlur={(e) => e.target.style.borderColor = '#D9D9D9'}
-                      />
-                    </div>
-
-                    {/* Option 3: Médiathèque */}
-                    <button
-                      onClick={() => setShowMediaLibrary(block.id)}
-                      style={{ ...styles.imageOptionButton, border: '2px dashed #D9D9D9' }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#e0f2fe';
-                        e.currentTarget.style.borderColor = '#0085C7';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f9fafb';
-                        e.currentTarget.style.borderColor = '#D9D9D9';
-                      }}
-                    >
-                      <Folder size={20} color="#0085C7" />
-                      <span>Médiathèque ({mediaLibrary.length} images)</span>
-                    </button>
-                  </div>
-
-                  {/* Aperçu avec bouton de suppression */}
-                  {block.content.url && (
-                    <div style={{ marginTop: '15px', position: 'relative', textAlign: 'center' }}>
-                      <img
-                        src={block.content.url}
-                        alt="Aperçu"
-                        style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
-                        onError={(e) => e.target.style.display = 'none'}
-                      />
-                      <button
-                        onClick={() => removeImageFromBlock(block.id)}
-                        style={styles.removeImageButton}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.9)'}
-                        title="Retirer l'image"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <ImageBlock
+                  blockId={block.id}
+                  imageUrl={block.content.url}
+                  mediaLibrary={mediaLibrary}
+                  loadingMedia={loadingMedia}
+                  onImageUpload={handleImageUpload}
+                  onImageUrlChange={updateBlockContent}
+                  onSelectFromMediaLibrary={selectFromMediaLibrary}
+                  onRemoveImage={removeImageFromBlock}
+                  onOpenMediaLibrary={setShowMediaLibrary}
+                />
               )}
             </div>
           ))}

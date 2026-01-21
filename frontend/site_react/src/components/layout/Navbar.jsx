@@ -120,7 +120,11 @@ export function Navbar() {
     padding: "8px 12px",
     borderRadius: "8px",
     backgroundColor: isActive ? "#f0f9ff" : "transparent",
-    transition: "all 0.2s",
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+    cursor: "pointer",
+    position: "relative",
+    transform: "translateZ(0)",
+    display: "inline-block",
   });
 
   const mobileNavLink = (isActive) => ({
@@ -131,8 +135,9 @@ export function Navbar() {
     padding: "12px 16px",
     borderRadius: "8px",
     backgroundColor: isActive ? "#f0f9ff" : "transparent",
-    transition: "all 0.2s",
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
     display: "block",
+    cursor: "pointer",
   });
 
   const navLinks = [
@@ -185,7 +190,21 @@ export function Navbar() {
 
         <div className="navbar-center" style={styles.navbarCenter}>
           {navLinks.map((link) => (
-            <Link key={link.to} to={link.to} style={navLink(isActive(link.to))}>
+            <Link 
+              key={link.to} 
+              to={link.to} 
+              style={navLink(isActive(link.to))}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#f0f9ff";
+                e.currentTarget.style.color = "#0085C7";
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isActive(link.to) ? "#f0f9ff" : "transparent";
+                e.currentTarget.style.color = isActive(link.to) ? "#0085C7" : "#000";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
               {link.label}
             </Link>
           ))}
@@ -207,18 +226,43 @@ export function Navbar() {
                   border: 'solid 2px #009F3D',
                   color: 'black',
                   borderRadius: '45px',
-                  fontWeight: '600'
+                  fontWeight: '600',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#009F3D';
+                  e.currentTarget.style.color = 'white';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 159, 61, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'black';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                se connecter
+                Se connecter
               </Link>
             )}
           </div>
 
           <button 
             className="burger-button"
-            style={styles.burgerButton} 
+            style={{
+              ...styles.burgerButton,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            }} 
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f0f9ff';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
           >
             {isMenuOpen ? <X size={28} /> : <Menu size={28} />}
           </button>

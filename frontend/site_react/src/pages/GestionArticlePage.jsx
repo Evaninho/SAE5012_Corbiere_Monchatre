@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Edit, Eye, Search, AlertTriangle, ArrowLeft, Loader, X, Plus, ArrowUp, ArrowDown, Type, Image } from 'lucide-react';
+import { Trash2, Edit, Eye, Search, AlertTriangle, ArrowLeft, Loader, X, Plus, ArrowUp, ArrowDown, Type, Image, Upload, Folder } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Popup } from '../components/Popup';
+import { ImageBlock } from '../components/common/ImageBlock';
+import { SearchBar } from '../components/common/SearchBar';
+import { LoadingScreen } from '../utils/LoadingScreen';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -11,6 +14,48 @@ export function GestionArticlesPage() {
   const queryClient = useQueryClient();
   const getToken = () => localStorage.getItem('authToken');
 
+  // Charger la médiathèque au montage
+  useEffect(() => {
+    loadMediaLibrary();
+  }, []);
+
+  // Charger les images depuis l'API (toutes les images de tous les articles)
+  const loadMediaLibrary = async () => {
+    setLoadingMedia(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/articles`);
+      if (!response.ok) throw new Error('Erreur de chargement');
+
+      const data = await response.json();
+      const articles = data.member || [];
+
+      // Extraire toutes les images de tous les blocks de tous les articles
+      const allImages = [];
+      articles.forEach(article => {
+        if (article.blocks) {
+          article.blocks.forEach(block => {
+            if (block.type === 'image' && block.content?.url) {
+              // Éviter les doublons
+              if (!allImages.some(img => img.url === block.content.url)) {
+                allImages.push({
+                  id: `${article.id}-${block.id}`,
+                  url: block.content.url,
+                  articleId: article.id
+                });
+              }
+            }
+          });
+        }
+      });
+
+      setMediaLibrary(allImages);
+    } catch (error) {
+      console.error('Erreur chargement médiathèque:', error);
+    } finally {
+      setLoadingMedia(false);
+    }
+  };
+
   // États
   const [searchTerm, setSearchTerm] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -18,6 +63,10 @@ export function GestionArticlesPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [articleToEdit, setArticleToEdit] = useState(null);
   const [editFormData, setEditFormData] = useState({ title: '', blocks: [] });
+  const [isLoadingArticle, setIsLoadingArticle] = useState(false);
+  const [showMediaLibrary, setShowMediaLibrary] = useState(null);
+  const [mediaLibrary, setMediaLibrary] = useState([]);
+  const [loadingMedia, setLoadingMedia] = useState(false);
   
   const [popup, setPopup] = useState({
     isOpen: false,
@@ -212,16 +261,25 @@ export function GestionArticlesPage() {
   // Mutation pour modifier
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
+      console.log('Envoi de la mise à jour (PATCH):', { id, data });
       const response = await fetch(`${API_BASE_URL}/articles/${id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
-          'Content-Type': 'application/ld+json',
+          'Content-Type': 'application/merge-patch+json',
           'Authorization': `Bearer ${getToken()}`
         },
         body: JSON.stringify(data)
       });
-      if (!response.ok) throw new Error('Erreur de modification');
-      return await response.json();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erreur réponse serveur:', { status: response.status, text: errorText });
+        throw new Error(`Erreur ${response.status}: ${errorText || 'Modification échouée'}`);
+      }
+      
+      const result = await response.json();
+      console.log('Mise à jour réussie:', result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['articles']);
@@ -231,14 +289,6 @@ export function GestionArticlesPage() {
         type: 'success',
         title: 'Modifié !',
         message: 'L\'article a été modifié avec succès'
-      });
-    },
-    onError: (error) => {
-      setPopup({
-        isOpen: true,
-        type: 'error',
-        title: 'Erreur',
-        message: error.message
       });
     }
   });
@@ -273,49 +323,108 @@ export function GestionArticlesPage() {
   };
 
   // Ouvrir modal édition
-  const handleEditClick = (article) => {
+  const handleEditClick = async (article) => {
+    setIsLoadingArticle(true);
     setArticleToEdit(article);
-    setEditFormData({
-      title: article.title,
-      blocks: article.blocks.map(b => ({...b}))
-    });
     setShowEditModal(true);
+    
+    try {
+      // Récupérer les détails complets de l'article avec les blocs
+      const response = await fetch(`${API_BASE_URL}/articles/${article.id}`);
+      if (!response.ok) throw new Error('Erreur de chargement');
+      
+      const fullArticle = await response.json();
+      
+      // Cloner les blocs existants en s'assurant que le contenu est bien préservé
+      const blocksToEdit = (fullArticle.blocks || [])
+        .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
+        .map(b => ({
+          id: b.id,
+          type: b.type,
+          orderIndex: b.orderIndex || 0,
+          content: { ...b.content } // Cloner le contenu
+        }));
+      
+      setEditFormData({
+        title: fullArticle.title,
+        blocks: blocksToEdit
+      });
+      setIsLoadingArticle(false);
+    } catch (error) {
+      setIsLoadingArticle(false);
+      setShowEditModal(false);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Impossible de charger les détails de l\'article'
+      });
+    }
   };
 
   // Sauvegarder modifications
   const handleSaveEdit = () => {
-    if (!editFormData.title.trim()) {
-      setPopup({
-        isOpen: true,
-        type: 'warning',
-        title: 'Titre manquant',
-        message: 'Veuillez entrer un titre'
-      });
-      return;
-    }
+    try {
+      if (!editFormData.title.trim()) {
+        setPopup({
+          isOpen: true,
+          type: 'warning',
+          title: 'Titre manquant',
+          message: 'Veuillez entrer un titre'
+        });
+        return;
+      }
 
-    const generatedContent = editFormData.blocks
-      .sort((a, b) => a.orderIndex - b.orderIndex)
-      .map(block => {
-        if (block.type === 'text') return block.content.text;
-        if (block.type === 'image') return `{url: ${block.content.url}}`;
-        return '';
-      })
-      .filter(text => text?.trim())
-      .join('\n\n');
+      console.log('Blocs avant modification:', editFormData.blocks);
 
-    updateMutation.mutate({
-      id: articleToEdit.id,
-      data: {
-        title: editFormData.title,
-        content: generatedContent,
-        blocks: editFormData.blocks.map(block => ({
+      const generatedContent = editFormData.blocks
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map(block => {
+          if (block.type === 'text') return block.content.text;
+          if (block.type === 'image') return `{url: ${block.content.url}}`;
+          return '';
+        })
+        .filter(text => text?.trim())
+        .join('\n\n');
+
+      // Préparer les blocs pour l'envoi
+      const blocksToSend = editFormData.blocks.map(block => {
+        const blockData = {
           type: block.type,
           orderIndex: block.orderIndex,
           content: block.content
-        }))
-      }
-    });
+        };
+        
+        // Ajouter l'ID seulement pour les blocs existants (ID < 1700000000000 = avant Date.now())
+        if (typeof block.id === 'number' && block.id < 1700000000000) {
+          blockData.id = block.id;
+        }
+        
+        return blockData;
+      });
+
+      // ===== Structure correcte pour PATCH =====
+      // Ne pas envoyer { id, data }, mais directement les champs à modifier
+      const patchData = {
+        title: editFormData.title,
+        content: generatedContent,
+        blocks: blocksToSend
+      };
+      
+      console.log('Données PATCH à envoyer:', patchData);
+      updateMutation.mutate({
+        id: articleToEdit.id,
+        data: patchData
+      });
+    } catch (error) {
+      console.error('Erreur dans handleSaveEdit:', error);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur de validation',
+        message: error.message || 'Une erreur est survenue lors du traitement'
+      });
+    }
   };
 
   // Gestion des blocks (édition)
@@ -359,6 +468,29 @@ export function GestionArticlesPage() {
         block.id === id ? { ...block, content } : block
       )
     });
+  };
+
+  // Gérer l'upload d'image
+  const handleImageUpload = (blockId, file) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageUrl = event.target.result;
+      updateBlockContent(blockId, { url: imageUrl });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Sélectionner une image depuis la médiathèque
+  const selectFromMediaLibrary = (blockId, imageUrl) => {
+    updateBlockContent(blockId, { url: imageUrl });
+    setShowMediaLibrary(null);
+  };
+
+  // Supprimer l'image du block
+  const removeImageFromBlock = (blockId) => {
+    updateBlockContent(blockId, { url: '' });
   };
 
   if (isLoading) {
@@ -413,18 +545,11 @@ export function GestionArticlesPage() {
         </div>
 
         {/* Filtres */}
-        <div style={filtersContainerStyle}>
-          <div style={{ position: "relative" }}>
-            <Search style={{ position: "absolute", left: "15px", top: "12px", width: "18px", color: "#666" }} />
-            <input
-              type="text"
-              placeholder="Rechercher un article ou un auteur..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={searchInputStyle}
-            />
-          </div>
-        </div>
+        <SearchBar 
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          placeholder="Rechercher un article ou un auteur..."
+        />
 
         {/* Tableau */}
         <div style={tableContainerStyle}>
@@ -546,15 +671,245 @@ export function GestionArticlesPage() {
 
       {/* MODAL ÉDITION */}
       {showEditModal && articleToEdit && (
-        <div style={modalOverlayStyle} onClick={() => setShowEditModal(false)}>
+        <div style={modalOverlayStyle} onClick={() => !isLoadingArticle && setShowEditModal(false)}>
           <div style={editModalStyle} onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
+            {isLoadingArticle ? (
+              <LoadingScreen isLoading={true} message="Chargement de l'article..." type="spinner" fullScreen={false} />
+            ) : (
+              <>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#0085C7' }}>
+                    ✏️ Modifier l'article
+                  </h2>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '5px',
+                      borderRadius: '50%'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <X size={24} color="#666" />
+                  </button>
+                </div>
+
+                {/* Titre */}
+                <input
+                  type="text"
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '15px',
+                    fontSize: '18px',
+                    border: '2px solid #D9D9D9',
+                    borderRadius: '10px',
+                    marginBottom: '20px',
+                    boxSizing: 'border-box',
+                    fontWeight: '600'
+                  }}
+                  placeholder="Titre de l'article"
+                />
+
+                {/* Blocks */}
+                {editFormData.blocks.map((block, index) => (
+                  <div key={block.id} style={{
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '10px',
+                    padding: '20px',
+                    marginBottom: '15px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                        {block.type === 'text' && <><Type size={16} /> Texte</>}
+                        {block.type === 'image' && <><Image size={16} /> Image</>}
+                      </div>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        {index > 0 && (
+                          <button onClick={() => moveBlock(index, 'up')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                            <ArrowUp size={16} color="#666" />
+                          </button>
+                        )}
+                        {index < editFormData.blocks.length - 1 && (
+                          <button onClick={() => moveBlock(index, 'down')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                            <ArrowDown size={16} color="#666" />
+                          </button>
+                        )}
+                        <button onClick={() => removeBlock(block.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                          <Trash2 size={16} color="#dc2626" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {block.type === 'text' && (
+                      <textarea
+                        value={block.content.text || ''}
+                        onChange={(e) => updateBlockContent(block.id, { text: e.target.value })}
+                        style={{
+                          width: '100%',
+                          minHeight: '100px',
+                          padding: '10px',
+                          border: '1px solid #D9D9D9',
+                          borderRadius: '8px',
+                          fontFamily: 'Arial',
+                          fontSize: '14px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    )}
+
+                    {block.type === 'image' && (
+                      <ImageBlock
+                        blockId={block.id}
+                        imageUrl={block.content.url}
+                        mediaLibrary={mediaLibrary}
+                        loadingMedia={loadingMedia}
+                        onImageUpload={handleImageUpload}
+                        onImageUrlChange={updateBlockContent}
+                        onSelectFromMediaLibrary={selectFromMediaLibrary}
+                        onRemoveImage={removeImageFromBlock}
+                        onOpenMediaLibrary={setShowMediaLibrary}
+                      />
+                    )}
+                  </div>
+                ))}
+
+                {/* Ajouter blocks */}
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                  <button
+                    onClick={() => addBlock('text')}
+                    style={{
+                      padding: '10px 15px',
+                      backgroundColor: '#e0f2fe',
+                      color: '#0085C7',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Plus size={16} /> Texte
+                  </button>
+                  <button
+                    onClick={() => addBlock('image')}
+                    style={{
+                      padding: '10px 15px',
+                      backgroundColor: '#dbeafe',
+                      color: '#1e40af',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Plus size={16} /> Image
+                  </button>
+                </div>
+
+                {/* Boutons */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      border: '2px solid #d1d5db',
+                      backgroundColor: 'white',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontWeight: '600'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={updateMutation.isPending}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      border: 'none',
+                      backgroundColor: updateMutation.isPending ? '#9ca3af' : '#009F3D',
+                      color: 'white',
+                      borderRadius: '10px',
+                      cursor: updateMutation.isPending ? 'not-allowed' : 'pointer',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                      opacity: updateMutation.isPending ? 0.7 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!updateMutation.isPending) {
+                        e.currentTarget.style.backgroundColor = '#008835';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!updateMutation.isPending) {
+                        e.currentTarget.style.backgroundColor = '#009F3D';
+                      }
+                    }}
+                  >
+                    {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MÉDIATHÈQUE */}
+      {showMediaLibrary !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            padding: '20px',
+            overflowY: 'auto'
+          }}
+          onClick={() => setShowMediaLibrary(null)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '15px',
+              padding: '30px',
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#0085C7' }}>
-                ✏️ Modifier l'article
+                📁 Médiathèque ({mediaLibrary.length} image{mediaLibrary.length > 1 ? 's' : ''})
               </h2>
               <button
-                onClick={() => setShowEditModal(false)}
+                onClick={() => setShowMediaLibrary(null)}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -569,168 +924,81 @@ export function GestionArticlesPage() {
               </button>
             </div>
 
-            {/* Titre */}
-            <input
-              type="text"
-              value={editFormData.title}
-              onChange={(e) => setEditFormData({ ...editFormData, title: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '15px',
-                fontSize: '18px',
-                border: '2px solid #D9D9D9',
-                borderRadius: '10px',
-                marginBottom: '20px',
-                boxSizing: 'border-box',
-                fontWeight: '600'
-              }}
-              placeholder="Titre de l'article"
-            />
-
-            {/* Blocks */}
-            {editFormData.blocks.map((block, index) => (
-              <div key={block.id} style={{
-                backgroundColor: '#f9fafb',
-                borderRadius: '10px',
-                padding: '20px',
-                marginBottom: '15px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
-                    {block.type === 'text' && <><Type size={16} /> Texte</>}
-                    {block.type === 'image' && <><Image size={16} /> Image</>}
-                  </div>
-                  <div style={{ display: 'flex', gap: '5px' }}>
-                    {index > 0 && (
-                      <button onClick={() => moveBlock(index, 'up')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-                        <ArrowUp size={16} color="#666" />
-                      </button>
-                    )}
-                    {index < editFormData.blocks.length - 1 && (
-                      <button onClick={() => moveBlock(index, 'down')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-                        <ArrowDown size={16} color="#666" />
-                      </button>
-                    )}
-                    <button onClick={() => removeBlock(block.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-                      <Trash2 size={16} color="#dc2626" />
-                    </button>
-                  </div>
-                </div>
-
-                {block.type === 'text' && (
-                  <textarea
-                    value={block.content.text || ''}
-                    onChange={(e) => updateBlockContent(block.id, { text: e.target.value })}
-                    style={{
-                      width: '100%',
-                      minHeight: '100px',
-                      padding: '10px',
-                      border: '1px solid #D9D9D9',
-                      borderRadius: '8px',
-                      fontFamily: 'Arial',
-                      fontSize: '14px',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                )}
-
-                {block.type === 'image' && (
-                  <div>
-                    <input
-                      type="text"
-                      value={block.content.url || ''}
-                      onChange={(e) => updateBlockContent(block.id, { url: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '10px',
-                        border: '1px solid #D9D9D9',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        boxSizing: 'border-box'
-                      }}
-                      placeholder="URL de l'image"
-                    />
-                    {block.content.url && (
-                      <img src={block.content.url} alt="Preview" style={{ maxWidth: '100%', maxHeight: '200px', marginTop: '10px', borderRadius: '8px' }} />
-                    )}
-                  </div>
-                )}
+            {loadingMedia ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                Chargement des images...
               </div>
-            ))}
+            ) : mediaLibrary.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <Folder size={48} color="#D9D9D9" style={{ marginBottom: '10px' }} />
+                <p>Aucune image dans la médiathèque</p>
+                <p style={{ fontSize: '14px', marginTop: '5px' }}>
+                  Les images des articles apparaîtront ici
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: window.innerWidth < 768 ? '1fr' : 'repeat(3, 1fr)',
+                gap: '15px',
+                marginTop: '20px'
+              }}>
+                {mediaLibrary.map((image) => {
+                  const currentBlock = editFormData.blocks.find(b => b.id === showMediaLibrary);
+                  const isSelected = currentBlock?.content?.url === image.url;
 
-            {/* Ajouter blocks */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <button
-                onClick={() => addBlock('text')}
-                style={{
-                  padding: '10px 15px',
-                  backgroundColor: '#e0f2fe',
-                  color: '#0085C7',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                <Plus size={16} /> Texte
-              </button>
-              <button
-                onClick={() => addBlock('image')}
-                style={{
-                  padding: '10px 15px',
-                  backgroundColor: '#dbeafe',
-                  color: '#1e40af',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px'
-                }}
-              >
-                <Plus size={16} /> Image
-              </button>
-            </div>
-
-            {/* Boutons */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => setShowEditModal(false)}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  border: '2px solid #d1d5db',
-                  backgroundColor: 'white',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                disabled={updateMutation.isPending}
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  border: 'none',
-                  backgroundColor: updateMutation.isPending ? '#9ca3af' : '#009F3D',
-                  color: 'white',
-                  borderRadius: '10px',
-                  cursor: updateMutation.isPending ? 'not-allowed' : 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                {updateMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}
-              </button>
-            </div>
+                  return (
+                    <div
+                      key={image.id}
+                      style={{
+                        position: 'relative',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        border: isSelected ? '3px solid #0085C7' : '2px solid transparent',
+                        transition: 'all 0.2s',
+                        boxShadow: isSelected ? '0 4px 12px rgba(0, 133, 199, 0.3)' : 'none'
+                      }}
+                      onClick={() => selectFromMediaLibrary(showMediaLibrary, image.url)}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#0085C7';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = 'transparent';
+                        }
+                      }}
+                    >
+                      <img
+                        src={image.url}
+                        alt="Médiathèque"
+                        style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+                      />
+                      {isSelected && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          backgroundColor: '#0085C7',
+                          color: 'white',
+                          borderRadius: '50%',
+                          width: '30px',
+                          height: '30px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold'
+                        }}>
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

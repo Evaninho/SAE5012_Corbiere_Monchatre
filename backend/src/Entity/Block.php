@@ -46,7 +46,7 @@ class Block
 
     private ?int $orderIndex = 0;
 
-    #[ORM\ManyToOne(inversedBy: 'blocks')]
+    #[ORM\ManyToOne(inversedBy: 'blocks', cascade: ['persist'])]
     #[Groups(['block:read', 'block:write'])]
     private ?Article $article = null;
 

@@ -109,12 +109,12 @@ export function GameIntroPage() {
           {[
             {
               title: "JO Paris 2024",
-              img: "https://cdn-icons-png.flaticon.com/512/535/535285.png",
+              img: "https://cdn-icons-png.flaticon.com/128/1926/1926496.png",
               link: "https://www.jetpunk.com/user-quizzes/1812795/jeux-olympiques-paris-2024",
             },
             {
               title: "Sports olympiques",
-              img: "https://cdn-icons-png.flaticon.com/512/2965/2965567.png",
+              img: "https://cdn-icons-png.flaticon.com/128/4163/4163684.png",
               link: "https://www.jetpunk.com/user-quizzes/1269592/sports-aux-jeux-olympiques-de-paris-2024",
             },
             {
