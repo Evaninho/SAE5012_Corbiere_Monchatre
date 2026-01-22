@@ -4,8 +4,8 @@ import { Trash2, Edit, Eye, Search, AlertTriangle, ArrowLeft, Loader, X, Plus, A
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Popup } from '../components/Popup';
 import { ImageBlock } from '../components/common/ImageBlock';
-import { VisualizationBlock } from '../components/common/VisualizationBlock';
-import { ChartRenderer } from '../components/common/ChartRendererold';
+import { VisualizationBlockEditable } from '../components/common/VisualizationBlockEditable';
+import ChartRenderer from '../components/common/ChartRenderer';
 import { SearchBar } from '../components/common/SearchBar';
 import { LoadingScreen } from '../utils/LoadingScreen';
 
@@ -808,6 +808,7 @@ export function GestionArticlesPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
                         {block.type === 'text' && <><Type size={16} /> Texte</>}
                         {block.type === 'image' && <><Image size={16} /> Image</>}
+                        {block.type === 'visualization' && <><BarChart3 size={16} /> Visualisation</>}
                       </div>
                       <div style={{ display: 'flex', gap: '5px' }}>
                         {index > 0 && (
@@ -856,11 +857,23 @@ export function GestionArticlesPage() {
                         onOpenMediaLibrary={setShowMediaLibrary}
                       />
                     )}
+
+                    {block.type === 'visualization' && (
+                      <VisualizationBlockEditable
+                        blockId={block.id}
+                        visualizationId={block.content.visualizationId}
+                        visualizations={visualizations}
+                        loadingVisualizations={loadingVisualizations}
+                        onVisualizationSelect={() => setShowVisualizationLibrary(block.id)}
+                        onRemoveVisualization={() => removeBlock(block.id)}
+                        onOpenMediaLibrary={() => setShowVisualizationLibrary(block.id)}
+                      />
+                    )}
                   </div>
                 ))}
 
                 {/* Ajouter blocks */}
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
                   <button
                     onClick={() => addBlock('text')}
                     style={{
@@ -896,6 +909,24 @@ export function GestionArticlesPage() {
                     }}
                   >
                     <Plus size={16} /> Image
+                  </button>
+                  <button
+                    onClick={() => addBlock('visualization')}
+                    style={{
+                      padding: '10px 15px',
+                      backgroundColor: '#fed7aa',
+                      color: '#ea580c',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Plus size={16} /> Visualisation
                   </button>
                 </div>
 
@@ -1236,13 +1267,11 @@ export function GestionArticlesPage() {
                         justifyContent: 'center',
                         border: '1px solid #e5e7eb'
                       }}>
-                        {viz.dataset ? (
-                          <ChartRenderer visualization={viz} height={150} />
-                        ) : (
-                          <p style={{ color: '#999', fontSize: '12px', margin: 0 }}>
-                            Aucun dataset
-                          </p>
-                        )}
+                        <ChartRenderer
+                          visualization={viz}
+                          isThumbnail={true}
+                          height={150}
+                        />
                       </div>
                     </div>
                   );

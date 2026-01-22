@@ -5,7 +5,7 @@ import { Search } from "../components/news/search";
 import { MessageSquare, Heart, Star, Plus, Settings, RefreshCw } from "lucide-react";
 import { usePermissions } from '../hooks/usePermissions';
 import { LoadingScreen } from '../utils/LoadingScreen';
-import { ChartRenderer } from '../components/common/ChartRendererold';
+import ChartRenderer from '../components/common/ChartRenderer';
 
 // ========== CONSTANTE API ==========
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -98,6 +98,63 @@ export function NewsPage3() {
   const { can } = usePermissions();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [showZone2, setShowZone2] = useState(false);
+  const [visualizations, setVisualizations] = useState([]);
+
+  // =======================
+  // LOAD VISUALIZATIONS
+  // =======================
+  const loadVisualizations = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const headers = {
+        'Content-Type': 'application/ld+json',
+        'Accept': 'application/ld+json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+
+      const response = await fetch(`${API_BASE_URL}/visualizations`, {
+        headers
+      });
+
+      if (!response.ok) throw new Error('Erreur chargement visualisations');
+
+      const data = await response.json();
+      const vizList = data.member || [];
+
+      // Enrichir les visualisations avec les datasets complets si nécessaire
+      const enrichedVizList = await Promise.all(
+        vizList.map(async (viz) => {
+          const hasDataset = viz.dataset && viz.dataset.id;
+          const hasDatasetId = viz.datasetId || (viz.dataset && typeof viz.dataset === 'string');
+
+          if (!hasDataset && hasDatasetId) {
+            try {
+              const actualDatasetId = viz.datasetId || viz.dataset;
+              const datasetResponse = await fetch(`${API_BASE_URL}/datasets/${actualDatasetId}`, {
+                headers
+              });
+              if (datasetResponse.ok) {
+                const dataset = await datasetResponse.json();
+                return { ...viz, dataset, datasetId: actualDatasetId };
+              }
+            } catch (err) {
+              console.warn(`Impossible charger dataset pour viz ${viz.id}:`, err);
+            }
+          }
+          return viz;
+        })
+      );
+
+      setVisualizations(enrichedVizList);
+    } catch (error) {
+      console.error('Erreur chargement visualisations:', error);
+    }
+  };
+
+  // Charger les visualisations au montage
+  React.useEffect(() => {
+    loadVisualizations();
+  }, []);
 
   // =======================
   // FETCH ARTICLES
@@ -421,11 +478,24 @@ export function NewsPage3() {
                         }}
                       />
                     </div>
-                  ) : hasViz ? (
-                    <div style={{ height: '200px', backgroundColor: '#f9fafb', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: '#999' }}>
-                      📊 Visualisation
-                    </div>
-                  ) : (
+                  ) : hasViz ? (() => {
+                    const viz = visualizations.find(v => v.id === firstViz.content?.visualizationId);
+                    return (
+                      <div style={{ height: '200px', backgroundColor: '#f9fafb', position: 'relative' }}>
+                        {viz ? (
+                          <ChartRenderer
+                            visualization={viz}
+                            isThumbnail={true}
+                            height={200}
+                          />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999', fontSize: '14px' }}>
+                            📊 Visualisation
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : (
                     // SANS IMAGE - Afficher le texte avec "Voir plus"
                     <div style={{ 
                       padding: '20px', 
@@ -598,11 +668,24 @@ export function NewsPage3() {
                         }}
                       />
                     </div>
-                  ) : hasViz ? (
-                    <div style={{ height: '200px', backgroundColor: '#f9fafb', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: '#999' }}>
-                      📊 Visualisation
-                    </div>
-                  ) : (
+                  ) : hasViz ? (() => {
+                    const viz = visualizations.find(v => v.id === firstViz.content?.visualizationId);
+                    return (
+                      <div style={{ height: '200px', backgroundColor: '#f9fafb', position: 'relative' }}>
+                        {viz ? (
+                          <ChartRenderer
+                            visualization={viz}
+                            isThumbnail={true}
+                            height={200}
+                          />
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999', fontSize: '14px' }}>
+                            📊 Visualisation
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : (
                     // SANS IMAGE - Afficher le texte avec "Voir plus"
                     <div style={{ 
                       padding: '20px', 

@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, Image as ImageIcon, Type, X, Upload, Folder, BarChart3 } from "lucide-react";
 import { Popup } from "../components/Popup";
 import { ImageBlock } from "../components/common/ImageBlock";
-import { VisualizationBlock } from "../components/common/VisualizationBlock";
-import { ChartRenderer } from "../components/common/ChartRendererold";
+import { VisualizationBlockEditable } from "../components/common/VisualizationBlockEditable";
+import ChartRenderer from "../components/common/ChartRenderer";
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -670,7 +670,7 @@ export function CreateArticlePage() {
 
               {/* Contenu VISUALISATION */}
               {block.type === 'visualization' && (
-                <VisualizationBlock
+                <VisualizationBlockEditable
                   blockId={block.id}
                   visualizationId={block.content.visualizationId}
                   visualizations={visualizations}
@@ -967,7 +967,6 @@ export function CreateArticlePage() {
                           </div>
                         )}
                       </div>
-
                       {/* Aperçu du graphique */}
                       <div style={{
                         backgroundColor: 'white',
@@ -979,13 +978,11 @@ export function CreateArticlePage() {
                         justifyContent: 'center',
                         border: '1px solid #e5e7eb'
                       }}>
-                        {viz.dataset ? (
-                          <ChartRenderer visualization={viz} height={150} />
-                        ) : (
-                          <p style={{ color: '#999', fontSize: '12px', margin: 0 }}>
-                            Aucun dataset
-                          </p>
-                        )}
+                        <ChartRenderer
+                          visualization={viz}
+                          isThumbnail={true}
+                          height={150}
+                        />
                       </div>
                     </div>
                   );

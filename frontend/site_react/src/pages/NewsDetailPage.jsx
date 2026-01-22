@@ -5,7 +5,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { Popup } from '../components/Popup';
 import { ImageBlock } from '../components/common/ImageBlock';
 import { VisualizationBlock } from '../components/common/VisualizationBlock';
-import { ChartRenderer } from '../components/common/ChartRendererold';
+import ChartRenderer from '../components/common/ChartRenderer';
 import { LoadingScreen } from '../utils/LoadingScreen';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -981,17 +981,14 @@ export function NewsDetailPage() {
             }
             if (block.type === 'visualization') {
               const viz = visualizations.find(v => v.id === block.content?.visualizationId);
-              if (viz && viz.dataset) {
+              if (viz) {
                 return (
-                  <div key={block.id} style={{ marginBottom: '25px', padding: '20px', backgroundColor: '#f9fafb', borderRadius: '14px', border: '1px solid #e5e7eb' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
-                      <BarChart3 size={18} color="#FF9800" />
-                      {viz.chartType} - {viz.dataset.name}
-                    </div>
-                    <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '8px', minHeight: '350px' }}>
-                      <ChartRenderer visualization={viz} height={350} />
-                    </div>
-                  </div>
+                  <VisualizationBlock
+                    key={block.id}
+                    visualization={viz}
+                    height={350}
+                    showTitle={true}
+                  />
                 );
               }
               return null;
