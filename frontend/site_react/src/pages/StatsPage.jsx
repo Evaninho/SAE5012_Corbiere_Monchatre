@@ -95,7 +95,12 @@ export default function StatsPage() {
     const token = getToken();
     if (!token) {
       console.log('⚠️ Pas de token d\'authentification. Vous devez être connecté.');
-      alert('Vous devez être connecté pour accéder à cette page');
+      setPopup({
+        isOpen: true,
+        type: 'warning',
+        title: 'Authentification requise',
+        message: 'Vous devez être connecté pour accéder à cette page'
+      });
       return;
     }
     loadDatasetsFromDB();
@@ -285,7 +290,12 @@ export default function StatsPage() {
   // ========== UPLOAD DATASET ==========
   const handleUploadDataset = async () => {
     if (!uploadFile || !uploadName.trim()) {
-      alert('Veuillez sélectionner un fichier et saisir un nom');
+      setPopup({
+        isOpen: true,
+        type: 'warning',
+        title: 'Informations manquantes',
+        message: 'Veuillez sélectionner un fichier et saisir un nom'
+      });
       return;
     }
 
@@ -316,7 +326,12 @@ export default function StatsPage() {
       setUploadFile(null);
       setUploadName('');
       loadDatasetsFromDB();
-      alert('✅ Dataset uploadé avec succès !');
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Succès',
+        message: 'Dataset uploadé avec succès !'
+      });
     } catch (error) {
       console.error('Erreur upload:', error);
       setPopup({
@@ -380,7 +395,12 @@ export default function StatsPage() {
       closeModal('register');
       setSelectedLocalDataset(null);
       loadDatasetsFromDB();
-      alert('✅ Dataset enregistré avec succès !');
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Succès',
+        message: 'Dataset enregistré avec succès !'
+      });
     } catch (error) {
       console.error('Erreur upload:', error);
       setPopup({
@@ -397,7 +417,12 @@ export default function StatsPage() {
   // ========== GESTION VISUALISATIONS ==========
   const handleCreateVisualization = async () => {
     if (!vizForm.xAxis || !vizForm.yAxis) {
-      alert('Veuillez sélectionner les variables X et Y');
+      setPopup({
+        isOpen: true,
+        type: 'warning',
+        title: 'Variables manquantes',
+        message: 'Veuillez sélectionner les variables X et Y'
+      });
       return;
     }
 
@@ -432,7 +457,12 @@ export default function StatsPage() {
       closeModal('createViz');
       setVizForm({ chartType: 'bar', xAxis: '', yAxis: '', colors: COLORS, title: '' });
       loadVisualizations(selectedDataset.id);
-      alert('✅ Visualisation créée avec succès !');
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Succès',
+        message: 'Visualisation créée avec succès !'
+      });
     } catch (error) {
       console.error('Erreur création visualisation:', error);
       setPopup({
@@ -449,7 +479,12 @@ export default function StatsPage() {
   const handleDeleteVisualization = async (vizId) => {
     // Vérifier les permissions
     if (userRole !== 'ROLE_DATA_PROVIDER' && userRole !== 'ROLE_ADMIN') {
-      alert('❌ Vous n\'avez pas la permission de supprimer une visualisation');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Permission refusée',
+        message: 'Vous n\'avez pas la permission de supprimer une visualisation'
+      });
       return;
     }
 
@@ -479,10 +514,20 @@ export default function StatsPage() {
       // Recharger les visualisations pour mettre à jour la liste
       await loadVisualizations(selectedDataset.id);
       
-      alert('✅ Visualisation supprimée');
+      setPopup({
+        isOpen: true,
+        type: 'success',
+        title: 'Succès',
+        message: 'Visualisation supprimée'
+      });
     } catch (error) {
       console.error('❌ Erreur:', error);
-      alert('Erreur lors de la suppression');
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de la suppression'
+      });
     } finally {
       setLoading(false);
     }

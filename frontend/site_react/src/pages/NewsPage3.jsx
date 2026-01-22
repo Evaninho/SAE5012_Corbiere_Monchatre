@@ -5,6 +5,7 @@ import { Search } from "../components/news/search";
 import { MessageSquare, Heart, Star, Plus, Settings, RefreshCw } from "lucide-react";
 import { usePermissions } from '../hooks/usePermissions';
 import { LoadingScreen } from '../utils/LoadingScreen';
+import { ChartRenderer } from '../components/common/ChartRendererold';
 
 // ========== CONSTANTE API ==========
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -362,8 +363,10 @@ export function NewsPage3() {
               );
 
               const firstImage = sortedBlocks.find(b => b.type === 'image');
+              const firstViz = sortedBlocks.find(b => b.type === 'visualization');
               const excerpt = getExcerpt(article.blocks);
               const hasImage = !!firstImage?.content?.url;
+              const hasViz = !!firstViz?.content?.visualizationId;
 
               // ===== MOYENNE DES ÉTOILES =====
               const ratings = article.ratings || [];
@@ -403,7 +406,7 @@ export function NewsPage3() {
                     </div>
                   )}
 
-                  {/* IMAGE OU TEXTE */}
+                  {/* IMAGE OU VISUALISATION OU TEXTE */}
                   {hasImage ? (
                     <div style={{ height: '200px', backgroundColor: '#e5e7eb', position: 'relative' }}>
                       <img
@@ -417,6 +420,10 @@ export function NewsPage3() {
                           transform: isHovered ? 'scale(1.05)' : 'scale(1)'
                         }}
                       />
+                    </div>
+                  ) : hasViz ? (
+                    <div style={{ height: '200px', backgroundColor: '#f9fafb', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: '#999' }}>
+                      📊 Visualisation
                     </div>
                   ) : (
                     // SANS IMAGE - Afficher le texte avec "Voir plus"
@@ -533,8 +540,10 @@ export function NewsPage3() {
               );
 
               const firstImage = sortedBlocks.find(b => b.type === 'image');
+              const firstViz = sortedBlocks.find(b => b.type === 'visualization');
               const excerpt = getExcerpt(article.blocks);
               const hasImage = !!firstImage?.content?.url;
+              const hasViz = !!firstViz?.content?.visualizationId;
 
               // ===== MOYENNE DES ÉTOILES =====
               const ratings = article.ratings || [];
@@ -588,6 +597,10 @@ export function NewsPage3() {
                           transform: isHovered ? 'scale(1.05)' : 'scale(1)'
                         }}
                       />
+                    </div>
+                  ) : hasViz ? (
+                    <div style={{ height: '200px', backgroundColor: '#f9fafb', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: '#999' }}>
+                      📊 Visualisation
                     </div>
                   ) : (
                     // SANS IMAGE - Afficher le texte avec "Voir plus"

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Share2, Star, MessageSquare, Send, Edit, Trash2, X, Plus, ArrowUp, ArrowDown, Type, Image, Upload, Folder } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, Star, MessageSquare, Send, Edit, Trash2, X, Plus, ArrowUp, ArrowDown, Type, Image, Upload, Folder, BarChart3 } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { Popup } from '../components/Popup';
 import { ImageBlock } from '../components/common/ImageBlock';
+import { VisualizationBlock } from '../components/common/VisualizationBlock';
+import { ChartRenderer } from '../components/common/ChartRendererold';
 import { LoadingScreen } from '../utils/LoadingScreen';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -37,6 +39,10 @@ export function NewsDetailPage() {
   const [showMediaLibrary, setShowMediaLibrary] = useState(null);
   const [mediaLibrary, setMediaLibrary] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
+
+  const [showVisualizationLibrary, setShowVisualizationLibrary] = useState(null);
+  const [visualizations, setVisualizations] = useState([]);
+  const [loadingVisualizations, setLoadingVisualizations] = useState(false);
 
   // ===== États pour la gestion des ratings =====
   const [editingRatingId, setEditingRatingId] = useState(null);
@@ -273,6 +279,7 @@ export function NewsDetailPage() {
   useEffect(() => {
     loadArticle();
     loadMediaLibrary();
+    loadVisualizationLibrary();
   }, [id]);
 
   const loadArticle = async () => {
@@ -336,6 +343,71 @@ export function NewsDetailPage() {
       console.error('Erreur chargement médiathèque:', error);
     } finally {
       setLoadingMedia(false);
+    }
+  };
+
+  // Charger les visualisations depuis l'API
+  const loadVisualizationLibrary = async () => {
+    setLoadingVisualizations(true);
+    try {
+      const token = getToken();
+      const headers = {
+        'Content-Type': 'application/ld+json',
+        'Accept': 'application/ld+json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/visualizations`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        console.error(`Erreur HTTP ${response.status}:`, response.statusText);
+        throw new Error(`Erreur HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const vizList = data.member || [];
+
+      // Enrichir les visualisations avec les informations complètes du dataset si manquant
+      const enrichedVizList = await Promise.all(
+        vizList.map(async (viz) => {
+          // Si dataset manque mais on a un datasetId ou dataset.id existe
+          const hasDataset = viz.dataset && viz.dataset.id;
+          const hasDatasetId = viz.datasetId || (viz.dataset && typeof viz.dataset === 'string');
+          
+          if (!hasDataset && (hasDatasetId)) {
+            try {
+              const actualDatasetId = viz.datasetId || viz.dataset;
+              const datasetResponse = await fetch(`${API_BASE_URL}/datasets/${actualDatasetId}`, {
+                headers
+              });
+              if (datasetResponse.ok) {
+                const dataset = await datasetResponse.json();
+                return {
+                  ...viz,
+                  dataset: dataset,
+                  datasetId: actualDatasetId
+                };
+              }
+            } catch (err) {
+              console.warn(`Impossible charger dataset pour visualisation ${viz.id}:`, err);
+            }
+          }
+          return viz;
+        })
+      );
+
+      setVisualizations(enrichedVizList);
+    } catch (error) {
+      console.error('Erreur chargement visualisations:', error);
+      setVisualizations([]);
+    } finally {
+      setLoadingVisualizations(false);
     }
   };
 
@@ -906,6 +978,23 @@ export function NewsDetailPage() {
             }
             if (block.type === 'image') {
               return <img key={block.id} src={block.content?.url} alt="" style={{ width: '100%', borderRadius: '14px', marginBottom: '25px' }} />;
+            }
+            if (block.type === 'visualization') {
+              const viz = visualizations.find(v => v.id === block.content?.visualizationId);
+              if (viz && viz.dataset) {
+                return (
+                  <div key={block.id} style={{ marginBottom: '25px', padding: '20px', backgroundColor: '#f9fafb', borderRadius: '14px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', fontSize: '14px', fontWeight: '600', color: '#666' }}>
+                      <BarChart3 size={18} color="#FF9800" />
+                      {viz.chartType} - {viz.dataset.name}
+                    </div>
+                    <div style={{ backgroundColor: 'white', padding: '15px', borderRadius: '8px', minHeight: '350px' }}>
+                      <ChartRenderer visualization={viz} height={350} />
+                    </div>
+                  </div>
+                );
+              }
+              return null;
             }
             return null;
           })}

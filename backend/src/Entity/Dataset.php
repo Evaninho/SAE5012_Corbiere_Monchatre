@@ -12,8 +12,8 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: DatasetRepository::class)]
 #[ApiResource(
     operations: [
-        new Get(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
-        new GetCollection(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
+        new Get(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER') or is_granted('ROLE_AUTHOR') or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"),
+        new GetCollection(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER') or is_granted('ROLE_AUTHOR') or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"),
         new Post(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
         new Put(security: "object.getUploadedBy() == user or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"),
         new Delete(security: "is_granted('ROLE_ADMIN')")
@@ -27,7 +27,7 @@ class Dataset
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['dataset:read'])]
+    #[Groups(['dataset:read', 'visualization:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, Image as ImageIcon, Type, X, Upload, Folder } from "lucide-react";
+import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, Image as ImageIcon, Type, X, Upload, Folder, BarChart3 } from "lucide-react";
 import { Popup } from "../components/Popup";
 import { ImageBlock } from "../components/common/ImageBlock";
+import { VisualizationBlock } from "../components/common/VisualizationBlock";
+import { ChartRenderer } from "../components/common/ChartRendererold";
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -25,11 +27,17 @@ export function CreateArticlePage() {
   const [mediaLibrary, setMediaLibrary] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
 
+  // État pour les visualisations
+  const [showVisualizationLibrary, setShowVisualizationLibrary] = useState(null); // ID du block concerné
+  const [visualizations, setVisualizations] = useState([]);
+  const [loadingVisualizations, setLoadingVisualizations] = useState(false);
+
   const getToken = () => localStorage.getItem('authToken');
 
   // Charger toutes les images des articles au montage
   useEffect(() => {
     loadMediaLibrary();
+    loadVisualizationLibrary();
   }, []);
 
   // Charger les images depuis l'API (toutes les images de tous les articles)
@@ -66,6 +74,71 @@ export function CreateArticlePage() {
       console.error('Erreur chargement médiathèque:', error);
     } finally {
       setLoadingMedia(false);
+    }
+  };
+
+  // Charger les visualisations depuis l'API
+  const loadVisualizationLibrary = async () => {
+    setLoadingVisualizations(true);
+    try {
+      const token = getToken();
+      const headers = {
+        'Content-Type': 'application/ld+json',
+        'Accept': 'application/ld+json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/visualizations`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        console.error(`Erreur HTTP ${response.status}:`, response.statusText);
+        throw new Error(`Erreur HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const vizList = data.member || [];
+
+      // Enrichir les visualisations avec les informations complètes du dataset si manquant
+      const enrichedVizList = await Promise.all(
+        vizList.map(async (viz) => {
+          // Si dataset manque mais on a un datasetId ou dataset.id existe
+          const hasDataset = viz.dataset && viz.dataset.id;
+          const hasDatasetId = viz.datasetId || (viz.dataset && typeof viz.dataset === 'string');
+          
+          if (!hasDataset && (hasDatasetId)) {
+            try {
+              const actualDatasetId = viz.datasetId || viz.dataset;
+              const datasetResponse = await fetch(`${API_BASE_URL}/datasets/${actualDatasetId}`, {
+                headers
+              });
+              if (datasetResponse.ok) {
+                const dataset = await datasetResponse.json();
+                return {
+                  ...viz,
+                  dataset: dataset,
+                  datasetId: actualDatasetId
+                };
+              }
+            } catch (err) {
+              console.warn(`Impossible charger dataset pour visualisation ${viz.id}:`, err);
+            }
+          }
+          return viz;
+        })
+      );
+
+      setVisualizations(enrichedVizList);
+    } catch (error) {
+      console.error('Erreur chargement visualisations:', error);
+      setVisualizations([]);
+    } finally {
+      setLoadingVisualizations(false);
     }
   };
 
@@ -322,7 +395,7 @@ export function CreateArticlePage() {
       id: Date.now(),
       type: type,
       orderIndex: blocks.length,
-      content: type === 'text' ? { text: '' } : type === 'image' ? { url: '' } : {}
+      content: type === 'text' ? { text: '' } : type === 'image' ? { url: '' } : type === 'visualization' ? { visualizationId: null } : {}
     };
     setBlocks([...blocks, newBlock]);
   };
@@ -378,6 +451,17 @@ export function CreateArticlePage() {
     updateBlockContent(blockId, { url: '' });
   };
 
+  // Sélectionner une visualisation
+  const selectVisualization = (blockId, visualizationId) => {
+    updateBlockContent(blockId, { visualizationId });
+    setShowVisualizationLibrary(null);
+  };
+
+  // Supprimer la visualisation du block
+  const removeVisualizationFromBlock = (blockId) => {
+    updateBlockContent(blockId, { visualizationId: null });
+  };
+
   // Soumettre l'article
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -403,6 +487,7 @@ export function CreateArticlePage() {
     const hasEmptyBlocks = blocks.some(block => {
       if (block.type === 'text') return !block.content.text?.trim();
       if (block.type === 'image') return !block.content.url?.trim();
+      if (block.type === 'visualization') return !block.content.visualizationId;
       return false;
     });
 
@@ -519,6 +604,7 @@ export function CreateArticlePage() {
                 <div style={styles.blockType}>
                   {block.type === 'text' && <><Type size={18} /> Texte</>}
                   {block.type === 'image' && <><ImageIcon size={18} /> Image</>}
+                  {block.type === 'visualization' && <><BarChart3 size={18} /> Visualisation</>}
                 </div>
 
                 <div style={styles.blockActions}>
@@ -581,6 +667,19 @@ export function CreateArticlePage() {
                   onOpenMediaLibrary={setShowMediaLibrary}
                 />
               )}
+
+              {/* Contenu VISUALISATION */}
+              {block.type === 'visualization' && (
+                <VisualizationBlock
+                  blockId={block.id}
+                  visualizationId={block.content.visualizationId}
+                  visualizations={visualizations}
+                  loadingVisualizations={loadingVisualizations}
+                  onVisualizationSelect={selectVisualization}
+                  onRemoveVisualization={removeVisualizationFromBlock}
+                  onOpenMediaLibrary={setShowVisualizationLibrary}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -617,6 +716,20 @@ export function CreateArticlePage() {
             >
               <ImageIcon size={18} />
               Image
+            </button>
+
+            <button
+              onClick={() => addBlock('visualization')}
+              style={{
+                ...styles.addBlockButton,
+                backgroundColor: '#fef3e0',
+                color: '#FF9800'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fde5b4'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fef3e0'}
+            >
+              <BarChart3 size={18} />
+              Visualisation
             </button>
           </div>
         </div>
@@ -741,6 +854,139 @@ export function CreateArticlePage() {
                           ✓
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MÉDIATHÈQUE VISUALISATIONS */}
+      {showVisualizationLibrary !== null && (
+        <div
+          style={styles.mediaLibraryOverlay}
+          onClick={() => setShowVisualizationLibrary(null)}
+        >
+          <div
+            style={styles.mediaLibraryModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#FF9800' }}>
+                📊 Visualisations ({visualizations.length} visualization{visualizations.length > 1 ? 's' : ''})
+              </h2>
+              <button
+                onClick={() => setShowVisualizationLibrary(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '5px',
+                  borderRadius: '50%'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <X size={24} color="#666" />
+              </button>
+            </div>
+
+            {loadingVisualizations ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                Chargement des visualisations...
+              </div>
+            ) : visualizations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <BarChart3 size={48} color="#D9D9D9" style={{ marginBottom: '10px' }} />
+                <p>Aucune visualisation disponible</p>
+                <p style={{ fontSize: '14px', marginTop: '5px' }}>
+                  Les visualisations créées apparaîtront ici
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+                {visualizations.map((viz) => {
+                  const isSelected = blocks.find(b => b.id === showVisualizationLibrary)?.content?.visualizationId === viz.id;
+
+                  return (
+                    <div
+                      key={viz.id}
+                      style={{
+                        padding: '12px',
+                        border: isSelected ? '3px solid #FF9800' : '2px solid #D9D9D9',
+                        borderRadius: '8px',
+                        backgroundColor: isSelected ? '#fff8f0' : '#f9fafb',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        position: 'relative'
+                      }}
+                      onClick={() => selectVisualization(showVisualizationLibrary, viz.id)}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#FF9800';
+                          e.currentTarget.style.backgroundColor = '#fffaf5';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#D9D9D9';
+                          e.currentTarget.style.backgroundColor = '#f9fafb';
+                        }
+                      }}
+                    >
+                      {/* Titre et type */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '600', color: '#333', fontSize: '14px' }}>
+                            {viz.chartType}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
+                            {viz.dataset?.name || 'Sans dataset'}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <div style={{
+                            backgroundColor: '#FF9800',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            flexShrink: 0
+                          }}>
+                            ✓
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Aperçu du graphique */}
+                      <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '6px',
+                        padding: '8px',
+                        minHeight: '150px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        {viz.dataset ? (
+                          <ChartRenderer visualization={viz} height={150} />
+                        ) : (
+                          <p style={{ color: '#999', fontSize: '12px', margin: 0 }}>
+                            Aucun dataset
+                          </p>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
