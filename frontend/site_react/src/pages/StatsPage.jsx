@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, PieChart, Pie, LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ResponsiveContainer } from 'recharts';
-import { Upload, BarChart3, TrendingUp, Plus, Eye, X } from 'lucide-react';
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie,
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, Cell, ResponsiveContainer
+} from 'recharts';
+import { Upload, BarChart3, TrendingUp, Plus, X, RefreshCw, Trash2 } from 'lucide-react';
 import Papa from 'papaparse';
 import { Popup } from '../components/Popup';
+import { usePermissions } from '../hooks/usePermissions';
 
+// ============ CONSTANTES ============
 const API_BASE = 'http://localhost:8000/api';
+const BACKEND_BASE = 'http://localhost:8000';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
-export default function OlympicsDataViz() {
+// Removed AVAILABLE_DATASETS as we now upload files directly
+
+const CHART_TYPES = [
+  { value: 'bar', label: '📊 Graphique en barres', icon: BarChart3 },
+  { value: 'pie', label: '🥧 Camembert', icon: null },
+  { value: 'line', label: '📈 Graphique en ligne', icon: TrendingUp },
+  { value: 'scatter', label: '⚫ Nuage de points', icon: null }
+];
+
+// ============ COMPOSANT PRINCIPAL ============
+export default function StatsPage() {
+  // État des données
   const [datasets, setDatasets] = useState([]);
   const [selectedDataset, setSelectedDataset] = useState(null);
-  const [visualizations, setVisualizations] = useState([]);
   const [csvData, setCsvData] = useState([]);
+  const [csvHeaders, setCsvHeaders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [user] = useState({ role: 'ROLE_DATA_PROVIDER' });
+  const { userRole } = usePermissions(); // Récupérer le rôle utilisateur
   const [popup, setPopup] = useState({
     isOpen: false,
     type: 'info',
@@ -21,19 +39,19 @@ export default function OlympicsDataViz() {
     message: ''
   });
 
-  const token = localStorage.getItem('token'); // 🔹 JWT récupéré ici
-
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showCreateVizModal, setShowCreateVizModal] = useState(false);
-  const [showViewVizModal, setShowViewVizModal] = useState(false);
+  // État des modales
+  const [modals, setModals] = useState({
+    upload: false,
+    createViz: false,
+    viewViz: false,
+  });
   const [selectedViz, setSelectedViz] = useState(null);
 
-  const [uploadForm, setUploadForm] = useState({
-    name: '',
-    file: null,
-    fileName: ''
-  });
+  // État pour l'upload
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadName, setUploadName] = useState('');
 
+  // État du formulaire de visualisation
   const [vizForm, setVizForm] = useState({
     chartType: 'bar',
     xAxis: '',
@@ -42,22 +60,167 @@ export default function OlympicsDataViz() {
     title: ''
   });
 
+  // États pour les contrôles de visualisation
+  const [chartRowsLimit, setChartRowsLimit] = useState(15);
+  const [chartSortOrder, setChartSortOrder] = useState('none');
+
+  // État pour le format CSV
+  const [csvFormat, setCsvFormat] = useState(null); // 'yearly' ou 'historical'
+  const [availableYears, setAvailableYears] = useState([]);
+  const [selectedYear, setSelectedYear] = useState(null);
+
+  // ========== UTILITAIRES D'AUTHENTIFICATION ==========
+  const getToken = () => localStorage.getItem('authToken');
+
+  const getAuthHeaders = () => {
+    const token = getToken();
+    return {
+      'Content-Type': 'application/ld+json',
+      'Accept': 'application/ld+json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+  };
+
+  // ========== GESTION DES MODALES ==========
+  const openModal = (modalName) => {
+    setModals(prev => ({ ...prev, [modalName]: true }));
+  };
+
+  const closeModal = (modalName) => {
+    setModals(prev => ({ ...prev, [modalName]: false }));
+  };
+
+  // ========== CYCLE DE VIE ==========
   useEffect(() => {
-    loadDatasets();
+    const token = getToken();
+    if (!token) {
+      console.log('⚠️ Pas de token d\'authentification. Vous devez être connecté.');
+      alert('Vous devez être connecté pour accéder à cette page');
+      return;
+    }
+    loadDatasetsFromDB();
   }, []);
 
-  const loadDatasets = async () => {
+  // ========== CHARGEMENT DES DONNÉES ==========
+  const loadDatasetsFromDB = async () => {
     try {
       setLoading(true);
+      const token = getToken();
+      console.log('🔐 Token présent:', !!token);
+      console.log('🔑 Token valeur:', token ? `${token.substring(0, 20)}...` : 'AUCUN');
+      
       const response = await fetch(`${API_BASE}/datasets`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
+
+      console.log('📡 Réponse API /datasets:', response.status, response.ok);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const data = await response.json();
-      setDatasets(data['hydra:member'] || []);
+      console.log('📦 Données reçues de l\'API:', data);
+      
+      const datasetsWithViz = data.member || data['hydra:member'] || [];
+      console.log('📊 Datasets trouvés:', datasetsWithViz.length);
+      
+      // Charger les visualisations pour chaque dataset
+      const datasetsEnriched = await Promise.all(
+        datasetsWithViz.map(async (dataset) => {
+          try {
+            const vizResponse = await fetch(`${API_BASE}/datasets/${dataset.id}`, {
+              headers: getAuthHeaders()
+            });
+            if (vizResponse.ok) {
+              const vizData = await vizResponse.json();
+              return {
+                ...dataset,
+                visualizations: vizData.visualizations || []
+              };
+            }
+          } catch (error) {
+            console.error(`Erreur chargement visualisations du dataset ${dataset.id}:`, error);
+          }
+          return dataset;
+        })
+      );
+      
+      console.log('✅ Datasets finaux:', datasetsEnriched);
+      setDatasets(datasetsEnriched);
     } catch (error) {
-      console.error('Erreur chargement datasets:', error);
+      console.error('❌ Erreur chargement datasets:', error);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur de connexion',
+        message: 'Impossible de charger les datasets. Êtes-vous connecté ?'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLocalCSV = async (datasetId, filename) => {
+    try {
+      setLoading(true);
+      console.log(`📥 Chargement du CSV pour le dataset ${datasetId}:`, filename);
+      
+      // Utiliser l'API pour télécharger le CSV (évite les problèmes CORS)
+      const response = await fetch(`${API_BASE}/datasets/${datasetId}/download`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const csvText = await response.text();
+      console.log('✅ CSV chargé avec succès');
+
+      return new Promise((resolve) => {
+        Papa.parse(csvText, {
+          header: true,
+          delimiter: ',',
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          trimHeaders: true,  // 🔧 Trim les espaces des en-têtes
+          transformHeader: (h) => h.trim(),  // 🔧 Transform les en-têtes aussi
+          complete: (results) => {
+            // Trim les clés de tous les objets
+            const trimmedData = results.data.map(row => {
+              const newRow = {};
+              Object.keys(row).forEach(key => {
+                newRow[key.trim()] = row[key];
+              });
+              return newRow;
+            });
+            
+            setCsvData(trimmedData);
+            const trimmedFields = (results.meta.fields || []).map(f => f.trim());
+            setCsvHeaders(trimmedFields);
+            
+            // Détecter le format du CSV
+            detectCSVFormat(trimmedData, trimmedFields);
+            
+            console.log(`📊 Données parsées: ${trimmedData.length} lignes, ${trimmedFields.length} colonnes`, trimmedFields);
+            resolve({ data: trimmedData, headers: trimmedFields });
+          },
+          error: (error) => {
+            console.error('❌ Erreur parsing CSV:', error);
+            resolve(null);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('❌ Erreur chargement CSV:', error);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: `Impossible de charger le fichier: ${error.message}`
+      });
+      return null;
     } finally {
       setLoading(false);
     }
@@ -66,94 +229,94 @@ export default function OlympicsDataViz() {
   const loadVisualizations = async (datasetId) => {
     try {
       const response = await fetch(`${API_BASE}/datasets/${datasetId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
+
+      if (!response.ok) {
+        throw new Error('Erreur chargement visualisations');
+      }
+
       const data = await response.json();
-      setVisualizations(data.visualizations || []);
+      // Mettre à jour le dataset sélectionné avec les visualisations
+      setSelectedDataset(prev => ({
+        ...prev,
+        visualizations: data.visualizations || []
+      }));
     } catch (error) {
-      console.error('Erreur chargement visualisations:', error);
+      console.error('❌ Erreur:', error);
     }
   };
 
-  const loadCSVData = async (datasetPath) => {
-    try {
-      const response = await fetch(datasetPath, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const csvText = await response.text();
-      Papa.parse(csvText, {
-        header: true,
-        delimiter: ';',
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          setCsvData(results.data);
-        }
-      });
-    } catch (error) {
-      console.error('Erreur chargement CSV:', error);
+  // ========== INTERACTIONS UTILISATEUR ==========
+  const handleSelectDataset = async (dataset) => {
+    console.log('📌 Sélection du dataset:', dataset.name);
+    setSelectedDataset(dataset);
+    loadVisualizations(dataset.id);
+
+    const filename = dataset.path.split('/').pop();
+    await loadLocalCSV(dataset.id, filename);
+  };
+
+  const detectVariableType = (data, columnName) => {
+    const sample = data.slice(0, 10).map(row => row[columnName]);
+    const hasNumbers = sample.some(val => !isNaN(val) && val !== null && val !== '');
+    return hasNumbers ? 'numeric' : 'categorical';
+  };
+
+  // Détecte le format du CSV (avec Year ou sans)
+  const detectCSVFormat = (data, headers) => {
+    const hasYear = headers.some(h => h.trim().toLowerCase() === 'year');
+    if (hasYear) {
+      // Extraire les années uniques et les trier
+      const years = [...new Set(data.map(row => row['Year'] || row[' Year']).filter(y => y))]
+        .sort((a, b) => b - a);
+      setAvailableYears(years);
+      setSelectedYear(years[0]); // Sélectionner la plus récente par défaut
+      setCsvFormat('yearly');
+      return 'yearly';
+    } else {
+      setAvailableYears([]);
+      setSelectedYear(null);
+      setCsvFormat('historical');
+      return 'historical';
     }
   };
 
-  const handleUploadCSV = async () => {
-    if (!uploadForm.file) return;
-
-    const formData = new FormData();
-    formData.append('file', uploadForm.file);
-    formData.append('name', uploadForm.name);
+  // ========== UPLOAD DATASET ==========
+  const handleUploadDataset = async () => {
+    if (!uploadFile || !uploadName.trim()) {
+      alert('Veuillez sélectionner un fichier et saisir un nom');
+      return;
+    }
 
     try {
       setLoading(true);
 
-      const uploadResponse = await fetch(`${API_BASE}/datasets/upload`, {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('name', uploadName.trim());
+
+      const response = await fetch(`${API_BASE}/datasets/upload`, {
         method: 'POST',
-        body: formData,
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: formData
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error('Erreur lors de l\'upload');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de l\'upload');
       }
 
-      const newDataset = await uploadResponse.json();
+      const data = await response.json();
+      console.log('✅ Dataset uploadé:', data);
 
-      Papa.parse(uploadForm.file, {
-        header: true,
-        delimiter: ';',
-        complete: async (results) => {
-          const headers = results.meta.fields;
-
-          for (let i = 0; i < headers.length; i++) {
-            const header = headers[i];
-            const type = detectVariableType(results.data, header);
-
-            await fetch(`${API_BASE}/dataset_variables`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/ld+json',
-                'Accept': 'application/ld+json',
-                'Authorization': `Bearer ${token}` // 🔹 JWT ajouté
-              },
-              body: JSON.stringify({
-                name: header,
-                type: type,
-                orderIndex: i,
-                dataset: `/api/datasets/${newDataset.id}`
-              })
-            });
-          }
-
-          setShowUploadModal(false);
-          setUploadForm({ name: '', file: null, fileName: '' });
-          loadDatasets();
-        }
-      });
+      closeModal('upload');
+      setUploadFile(null);
+      setUploadName('');
+      loadDatasetsFromDB();
+      alert('✅ Dataset uploadé avec succès !');
     } catch (error) {
       console.error('Erreur upload:', error);
       setPopup({
@@ -167,7 +330,77 @@ export default function OlympicsDataViz() {
     }
   };
 
+  // ========== ENREGISTREMENT DATASET ==========
+  const handleRegisterDataset = async () => {
+    if (!selectedLocalDataset) return;
+
+    try {
+      setLoading(true);
+
+      const csvResult = await loadLocalCSV(selectedLocalDataset.filename);
+      if (!csvResult) return;
+
+      const datasetResponse = await fetch(`${API_BASE}/datasets`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: selectedLocalDataset.name,
+          path: `/datasets/${selectedLocalDataset.filename}`,
+        })
+      });
+
+      if (!datasetResponse.ok) {
+        const errorData = await datasetResponse.json();
+        throw new Error(errorData.detail || 'Erreur lors de l\'enregistrement du dataset');
+      }
+
+      const newDataset = await datasetResponse.json();
+
+      // Créer les variables associées
+      for (let i = 0; i < csvResult.headers.length; i++) {
+        const header = csvResult.headers[i];
+        const type = detectVariableType(csvResult.data, header);
+
+        const varResponse = await fetch(`${API_BASE}/dataset_variables`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name: header,
+            type: type,
+            orderIndex: i,
+            dataset: `/api/datasets/${newDataset.id}`
+          })
+        });
+
+        if (!varResponse.ok) {
+          console.error(`Erreur création variable ${header}`);
+        }
+      }
+
+      closeModal('register');
+      setSelectedLocalDataset(null);
+      loadDatasetsFromDB();
+      alert('✅ Dataset enregistré avec succès !');
+    } catch (error) {
+      console.error('Erreur upload:', error);
+      setPopup({
+        isOpen: true,
+        type: 'error',
+        title: 'Erreur',
+        message: 'Erreur lors de l\'upload du fichier'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ========== GESTION VISUALISATIONS ==========
   const handleCreateVisualization = async () => {
+    if (!vizForm.xAxis || !vizForm.yAxis) {
+      alert('Veuillez sélectionner les variables X et Y');
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -180,11 +413,7 @@ export default function OlympicsDataViz() {
 
       const response = await fetch(`${API_BASE}/visualizations`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/ld+json',
-          'Accept': 'application/ld+json',
-          'Authorization': `Bearer ${token}` // 🔹 JWT ajouté
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           chartType: vizForm.chartType,
           config: config,
@@ -193,12 +422,17 @@ export default function OlympicsDataViz() {
       });
 
       if (!response.ok) {
-        throw new Error('Erreur lors de la création de la visualisation');
+        const error = await response.json();
+        throw new Error(error.detail || 'Erreur lors de la création de la visualisation');
       }
 
-      setShowCreateVizModal(false);
+      const data = await response.json();
+      console.log('✅ Visualisation créée:', data);
+
+      closeModal('createViz');
       setVizForm({ chartType: 'bar', xAxis: '', yAxis: '', colors: COLORS, title: '' });
       loadVisualizations(selectedDataset.id);
+      alert('✅ Visualisation créée avec succès !');
     } catch (error) {
       console.error('Erreur création visualisation:', error);
       setPopup({
@@ -212,142 +446,360 @@ export default function OlympicsDataViz() {
     }
   };
 
-  const handleSelectDataset = (dataset) => {
-    setSelectedDataset(dataset);
-    loadVisualizations(dataset.id);
-    loadCSVData(dataset.path);
-  };
+  const handleDeleteVisualization = async (vizId) => {
+    // Vérifier les permissions
+    if (userRole !== 'ROLE_DATA_PROVIDER' && userRole !== 'ROLE_ADMIN') {
+      alert('❌ Vous n\'avez pas la permission de supprimer une visualisation');
+      return;
+    }
 
-  const renderChart = (viz, data) => {
-    const config = viz.config;
-    const chartData = data.slice(0, 15).map(row => ({
-      name: String(row[config.xAxis] || '').substring(0, 15),
-      value: parseFloat(row[config.yAxis]) || 0
-    }));
+    if (!window.confirm('⚠️ Êtes-vous sûr de vouloir supprimer cette visualisation ?')) {
+      return;
+    }
 
-    switch (viz.chartType) {
-      case 'bar':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" fill="#0088FE" name={config.yAxis}>
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        );
+    try {
+      setLoading(true);
+      
+      // Extraire l'ID numérique si c'est au format IRI
+      const numericId = typeof vizId === 'string' && vizId.includes('/') ? vizId.split('/').pop() : vizId;
+      const deleteUrl = `${API_BASE}/visualizations/${numericId}`;
+      
+      console.log('🗑️ Suppression de la visualisation:', { vizId, numericId, deleteUrl });
+      
+      const response = await fetch(deleteUrl, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
 
-      case 'pie':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <PieChart>
-              <Pie
-                data={chartData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={120}
-                label={(entry) => `${entry.name}: ${entry.value}`}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        );
+      if (!response.ok) throw new Error('Erreur suppression');
 
-      case 'line':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="value" stroke="#0088FE" strokeWidth={2} name={config.yAxis} />
-            </LineChart>
-          </ResponsiveContainer>
-        );
-
-      case 'scatter':
-        return (
-          <ResponsiveContainer width="100%" height={400}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" type="category" angle={-45} textAnchor="end" height={100} />
-              <YAxis dataKey="value" />
-              <Tooltip />
-              <Legend />
-              <Scatter data={chartData} fill="#0088FE" name={config.yAxis} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        );
-
-      default:
-        return <div>Type de graphique non supporté</div>;
+      closeModal('viewViz');
+      setSelectedViz(null);
+      
+      // Recharger les visualisations pour mettre à jour la liste
+      await loadVisualizations(selectedDataset.id);
+      
+      alert('✅ Visualisation supprimée');
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      alert('Erreur lors de la suppression');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ========== RENDU GRAPHIQUES ==========
+  const renderChart = (viz, data) => {
+    const config = viz.config;
+    
+    // Trouver les vraies clés dans les données (trim les espaces)
+    const getDataValue = (row, key) => {
+      // Chercher d'abord la clé exacte
+      if (row.hasOwnProperty(key)) {
+        return row[key];
+      }
+      // Si pas trouvée, chercher en trimant les espaces
+      const trimmedKey = Object.keys(row).find(k => k.trim() === key.trim());
+      return trimmedKey ? row[trimmedKey] : null;
+    };
+    
+    // Filtrer par année si le CSV est au format 'yearly'
+    let filteredData = data;
+    if (csvFormat === 'yearly' && selectedYear) {
+      filteredData = data.filter(row => {
+        const rowYear = getDataValue(row, 'Year');
+        return rowYear === selectedYear || rowYear === String(selectedYear);
+      });
+      console.log(`🎯 Données filtrées pour l'année ${selectedYear}: ${filteredData.length} lignes`);
+    }
+    
+    // Mapper les données avec validation et trim des clés
+    // Important: on traite TOUTES les données d'abord, puis on trie, puis on limite
+    let chartData = filteredData.map(row => {
+      const xValue = String(getDataValue(row, config.xAxis) || '').substring(0, 25).trim();
+      const yValue = parseFloat(getDataValue(row, config.yAxis)) || 0;
+      return {
+        name: xValue || '(vide)',
+        value: yValue,
+        _original: row
+      };
+    }).filter(item => item.name !== '(vide)' || item.value !== 0);
+
+    // Appliquer le tri
+    if (chartSortOrder === 'asc') {
+      chartData = chartData.sort((a, b) => a.value - b.value);
+    } else if (chartSortOrder === 'desc') {
+      chartData = chartData.sort((a, b) => b.value - a.value);
+    }
+
+    // Limiter le nombre de données affichées selon la sélection de l'utilisateur
+    chartData = chartData.slice(0, chartRowsLimit);
+
+    // Hauteur dynamique : minimum 400px, puis ajustée selon le nombre de lignes
+    const dynamicHeight = Math.max(400, 200 + chartData.length * 20);
+
+    console.log('📊 Chart Data:', { 
+      xAxis: config.xAxis, 
+      yAxis: config.yAxis,
+      rowsLimit: chartRowsLimit,
+      sortOrder: chartSortOrder,
+      firstEntry: chartData[0],
+      dataCount: chartData.length,
+      dynamicHeight
+    });
+
+    const commonProps = { width: "100%", height: dynamicHeight };
+
+    // Tooltip personnalisé pour tous les graphiques
+    const CustomTooltip = ({ active, payload }) => {
+      if (active && payload && payload.length) {
+        const dataPoint = payload[0];
+        // Accès aux données originales du chartData via payload[0].payload
+        const originalData = dataPoint.payload;
+        
+        return (
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            padding: '14px 16px',
+            border: '3px solid #0088FE',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            zIndex: 1000,
+            fontFamily: 'system-ui, -apple-system, sans-serif'
+          }}>
+            <p style={{ margin: '6px 0', fontWeight: 'bold', color: '#1a202c', fontSize: '14px' }}>
+              📍 {config.xAxis}: <span style={{ color: '#0088FE' }}>{originalData.name}</span>
+            </p>
+            <p style={{ margin: '6px 0', color: '#2d3748', fontWeight: '600', fontSize: '14px' }}>
+              📊 {config.yAxis}: <strong style={{ color: '#FF8042', fontSize: '16px' }}>{originalData.value}</strong>
+            </p>
+          </div>
+        );
+      }
+      return null;
+    };
+
+    const charts = {
+      bar: (
+        <ResponsiveContainer {...commonProps}>
+          <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45} 
+              textAnchor="end" 
+              height={100}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis style={{ fontSize: '12px' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 136, 254, 0.1)' }} />
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              verticalAlign="top"
+              height={36}
+            />
+            <Bar dataKey="value" fill="#0088FE" name={config.yAxis || 'Valeur'}>
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      ),
+      pie: (
+        <ResponsiveContainer {...commonProps}>
+          <PieChart margin={{ top: 20, right: 30, bottom: 80, left: 0 }}>
+            <Pie
+              data={chartData}
+              dataKey="value"
+              nameKey="name"
+              cx="40%"
+              cy="45%"
+              outerRadius={110}
+              label={({ name, value }) => `${name}: ${value}`}
+              labelLine={true}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
+              ))}
+            </Pie>
+            <Tooltip 
+              content={<CustomTooltip />}
+              formatter={(value) => `${config.yAxis}: ${value}`}
+              labelFormatter={(label) => `${config.xAxis}: ${label}`}
+            />
+            <Legend 
+              verticalAlign="bottom" 
+              height={36}
+              wrapperStyle={{ paddingTop: '20px' }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      ),
+      line: (
+        <ResponsiveContainer {...commonProps}>
+          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="name" 
+              angle={-45} 
+              textAnchor="end" 
+              height={100}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis style={{ fontSize: '12px' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#0088FE', strokeWidth: 2 }} />
+            <Legend 
+              wrapperStyle={{ paddingTop: '20px' }}
+              verticalAlign="top"
+              height={36}
+            />
+            <Line 
+              type="monotone" 
+              dataKey="value" 
+              stroke="#0088FE" 
+              strokeWidth={3}
+              dot={{ fill: '#0088FE', r: 5 }}
+              activeDot={{ r: 7, fill: '#FF8042' }}
+              name={config.yAxis || 'Valeur'}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      ),
+      scatter: (
+        <ResponsiveContainer {...commonProps}>
+          <ScatterChart margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis 
+              dataKey="name" 
+              type="category" 
+              angle={-45} 
+              textAnchor="end" 
+              height={100}
+              style={{ fontSize: '12px' }}
+            />
+            <YAxis 
+              dataKey="value"
+              style={{ fontSize: '12px' }}
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 136, 254, 0.1)' }} />
+            <Legend 
+              verticalAlign="top"
+              height={36}
+              wrapperStyle={{ paddingTop: '20px' }}
+            />
+            <Scatter 
+              data={chartData} 
+              fill="#0088FE" 
+              name={config.yAxis || 'Valeur'}
+              shape="circle"
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      )
+    };
+
+    return charts[viz.chartType] || <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Type non supporté</div>;
+  };
+
+  // ========== OBJETS DE STYLE ==========
   const styles = {
     container: {
       minHeight: '100vh',
-      backgroundColor: '#f5f5f5',
-      padding: '30px'
+      backgroundColor: '#f8f9fa',
+      padding: '30px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
     },
     header: {
       backgroundColor: 'white',
-      padding: '25px',
-      borderRadius: '15px',
+      padding: '30px',
+      borderRadius: '16px',
       marginBottom: '30px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
       display: 'flex',
       justifyContent: 'space-between',
-      alignItems: 'center'
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: '20px'
     },
     title: {
-      fontSize: '28px',
-      fontWeight: 'bold',
-      color: '#0085C7',
-      margin: 0
+      fontSize: '32px',
+      fontWeight: '700',
+      color: '#1a202c',
+      margin: 0,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
     },
-    button: {
+    buttonPrimary: {
       padding: '12px 24px',
       backgroundColor: '#0085C7',
       color: 'white',
       border: 'none',
-      borderRadius: '8px',
+      borderRadius: '10px',
       cursor: 'pointer',
-      fontSize: '16px',
+      fontSize: '15px',
       fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'all 0.2s',
+      boxShadow: '0 2px 4px rgba(0,133,199,0.2)'
+    },
+    buttonSuccess: {
+      padding: '12px 24px',
+      backgroundColor: '#27ae60',
+      color: 'white',
+      border: 'none',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      fontSize: '15px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'all 0.2s'
+    },
+    sectionTitle: {
+      fontSize: '24px',
+      fontWeight: '600',
+      color: '#2d3748',
+      marginBottom: '20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    },
+    grid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+      gap: '24px',
+      marginBottom: '40px'
+    },
+    card: {
+      backgroundColor: 'white',
+      padding: '24px',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      border: '1px solid #e2e8f0'
+    },
+    cardTitle: {
+      fontSize: '18px',
+      fontWeight: '600',
+      color: '#0085C7',
+      marginBottom: '12px',
       display: 'flex',
       alignItems: 'center',
       gap: '8px'
     },
-    grid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-      gap: '20px',
-      marginBottom: '30px'
-    },
-    card: {
-      backgroundColor: 'white',
-      padding: '20px',
-      borderRadius: '12px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      cursor: 'pointer',
-      transition: 'transform 0.2s, box-shadow 0.2s'
+    cardText: {
+      fontSize: '14px',
+      color: '#718096',
+      marginBottom: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px'
     },
     modal: {
       position: 'fixed',
@@ -355,424 +807,108 @@ export default function OlympicsDataViz() {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(0,0,0,0.6)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000,
-      padding: '20px'
+      padding: '20px',
+      backdropFilter: 'blur(4px)'
     },
     modalContent: {
       backgroundColor: 'white',
-      borderRadius: '15px',
-      padding: '30px',
+      borderRadius: '16px',
+      padding: '32px',
       maxWidth: '600px',
       width: '100%',
       maxHeight: '90vh',
-      overflow: 'auto'
+      overflow: 'auto',
+      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
     },
     modalContentLarge: {
       backgroundColor: 'white',
-      borderRadius: '15px',
-      padding: '30px',
+      borderRadius: '16px',
+      padding: '32px',
       maxWidth: '1000px',
       width: '100%',
       maxHeight: '90vh',
-      overflow: 'auto'
+      overflow: 'auto',
+      boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+    },
+    modalHeader: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '24px',
+      paddingBottom: '16px',
+      borderBottom: '2px solid #e2e8f0'
+    },
+    modalTitle: {
+      fontSize: '24px',
+      fontWeight: '600',
+      color: '#1a202c',
+      margin: 0
     },
     input: {
       width: '100%',
-      padding: '12px',
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      fontSize: '14px',
-      marginBottom: '15px',
-      boxSizing: 'border-box'
+      padding: '14px 16px',
+      border: '2px solid #e2e8f0',
+      borderRadius: '10px',
+      fontSize: '15px',
+      marginBottom: '16px',
+      boxSizing: 'border-box',
+      transition: 'border-color 0.2s',
+      fontFamily: 'inherit'
     },
     select: {
       width: '100%',
-      padding: '12px',
-      border: '1px solid #ddd',
-      borderRadius: '8px',
-      fontSize: '14px',
-      marginBottom: '15px',
-      backgroundColor: 'white'
+      padding: '14px 16px',
+      border: '2px solid #e2e8f0',
+      borderRadius: '10px',
+      fontSize: '15px',
+      marginBottom: '16px',
+      backgroundColor: 'white',
+      cursor: 'pointer',
+      fontFamily: 'inherit'
     },
     label: {
       display: 'block',
       marginBottom: '8px',
       fontWeight: '600',
-      color: '#333'
+      color: '#2d3748',
+      fontSize: '14px'
+    },
+    infoBox: {
+      padding: '16px',
+      backgroundColor: '#f7fafc',
+      borderRadius: '10px',
+      marginBottom: '20px',
+      border: '1px solid #e2e8f0'
+    },
+    emptyState: {
+      textAlign: 'center',
+      padding: '60px 20px',
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      border: '2px dashed #cbd5e0'
+    },
+    loadingState: {
+      textAlign: 'center',
+      padding: '60px',
+      color: '#718096'
     }
   };
 
-  // Styles supplémentaires pour les boutons de navigation
-  const buttonStyles = {
-    navButton: {
-      padding: '10px 20px',
-      backgroundColor: '#0085C7',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: '600',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      transition: 'background-color 0.3s'
-    },
-    navButtonDisabled: {
-      padding: '10px 20px',
-      backgroundColor: '#ccc',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      cursor: 'not-allowed',
-      fontSize: '14px',
-      fontWeight: '600',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px'
-    },
-    datasetNav: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '15px',
-      justifyContent: 'space-between',
-      backgroundColor: 'white',
-      padding: '20px 25px',
-      borderRadius: '15px',
-      marginBottom: '30px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      flexWrap: 'wrap'
-    },
-    datasetInfo: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '15px',
-      flex: 1
-    },
-    datasetTitle: {
-      fontSize: '18px',
-      fontWeight: 'bold',
-      color: '#0085C7'
-    },
-    datasetPath: {
-      fontSize: '14px',
-      color: '#666'
-    },
-    chartContainer: {
-      backgroundColor: 'white',
-      borderRadius: '15px',
-      padding: '30px',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-      marginBottom: '30px'
-    },
-    chartTitle: {
-      fontSize: '20px',
-      fontWeight: 'bold',
-      color: '#0085C7',
-      marginBottom: '20px'
-    },
-    chart: {
-      width: '100%',
-      height: '400px',
-      backgroundColor: '#f9fafb',
-      borderRadius: '10px',
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'space-around',
-      padding: '20px',
-      gap: '10px'
-    },
-    chartBar: (height, maxHeight) => ({
-      flex: 1,
-      height: `${Math.max((height / maxHeight) * 350, 20)}px`,
-      backgroundColor: '#0085C7',
-      borderRadius: '5px 5px 0 0',
-      position: 'relative',
-      minHeight: '20px',
-      cursor: 'pointer',
-      transition: 'background-color 0.3s'
-    }),
-    chartBarLabel: {
-      fontSize: '12px',
-      color: '#666',
-      marginTop: '10px',
-      textAlign: 'center',
-      width: '100%'
-    }
-  };
+  // ========== COMPOSANTS DE L'INTERFACE ==========
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>📊 Visualisation de Données - Jeux Olympiques</h1>
-        {user.role === 'ROLE_DATA_PROVIDER' && (
-          <button style={styles.button} onClick={() => setShowUploadModal(true)}>
-            <Upload size={20} />
-            Importer un CSV
-          </button>
-        )}
-      </div>
-
-      <div style={{ marginBottom: '30px' }}>
-        <h2 style={{ fontSize: '22px', marginBottom: '20px', color: '#333' }}>
-          📁 Jeux de données disponibles ({datasets.length})
-        </h2>
-        
-        {loading && datasets.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            Chargement des datasets...
-          </div>
-        ) : datasets.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-            Aucun dataset disponible. Importez votre premier fichier CSV !
-          </div>
-        ) : (
-          <div style={styles.grid}>
-            {datasets.map(dataset => (
-              <div
-                key={dataset.id}
-                style={styles.card}
-                onClick={() => handleSelectDataset(dataset)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                }}
-              >
-                <h3 style={{ fontSize: '18px', marginBottom: '10px', color: '#0085C7' }}>
-                  {dataset.name}
-                </h3>
-                <p style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
-                  📅 Créé le {new Date(dataset.createdAt).toLocaleDateString('fr-FR')}
-                </p>
-                <p style={{ fontSize: '14px', color: '#666' }}>
-                  📊 {dataset.datasetVariables?.length || 0} variables
-                </p>
-                <p style={{ fontSize: '14px', color: '#666' }}>
-                  📈 {dataset.visualizations?.length || 0} visualisations
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {selectedDataset && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '22px', color: '#333' }}>
-              📈 Visualisations - {selectedDataset.name}
-            </h2>
-            <button style={styles.button} onClick={() => setShowCreateVizModal(true)}>
-              <Plus size={20} />
-              Créer une visualisation
-            </button>
-          </div>
-
-          {visualizations.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', backgroundColor: 'white', borderRadius: '12px' }}>
-              <p style={{ color: '#666', marginBottom: '20px' }}>
-                Aucune visualisation créée pour ce dataset.
-              </p>
-              <button style={styles.button} onClick={() => setShowCreateVizModal(true)}>
-                <Plus size={20} />
-                Créer la première visualisation
-              </button>
-            </div>
-          ) : (
-            <div style={styles.grid}>
-              {visualizations.map(viz => (
-                <div
-                  key={viz.id}
-                  style={styles.card}
-                  onClick={() => {
-                    setSelectedViz(viz);
-                    setShowViewVizModal(true);
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-4px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                    {viz.chartType === 'bar' && <BarChart3 size={24} color="#0085C7" />}
-                    {viz.chartType === 'line' && <TrendingUp size={24} color="#0085C7" />}
-                    <h3 style={{ fontSize: '18px', color: '#333', margin: 0 }}>
-                      {viz.config.title || `Graphique ${viz.chartType}`}
-                    </h3>
-                  </div>
-                  <p style={{ fontSize: '14px', color: '#666' }}>
-                    Type: {viz.chartType === 'bar' ? 'Barres' : viz.chartType === 'pie' ? 'Camembert' : viz.chartType === 'line' ? 'Ligne' : 'Nuage de points'}
-                  </p>
-                  <p style={{ fontSize: '14px', color: '#666' }}>
-                    Variables: {viz.config.xAxis} / {viz.config.yAxis}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {showUploadModal && (
-        <div style={styles.modal} onClick={() => setShowUploadModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>📤 Importer un fichier CSV</h2>
-              <button onClick={() => setShowUploadModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            <label style={styles.label}>Nom du dataset</label>
-            <input
-              type="text"
-              style={styles.input}
-              placeholder="Ex: Médailles JO 2024"
-              value={uploadForm.name}
-              onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
-            />
-
-            <label style={styles.label}>Fichier CSV (séparateur: ;)</label>
-            <input
-              type="file"
-              accept=".csv"
-              style={styles.input}
-              onChange={(e) => setUploadForm({
-                ...uploadForm,
-                file: e.target.files[0],
-                fileName: e.target.files[0]?.name || ''
-              })}
-            />
-
-            {uploadForm.fileName && (
-              <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
-                📄 Fichier sélectionné: {uploadForm.fileName}
-              </p>
-            )}
-
-            <button
-              onClick={handleUploadCSV}
-              style={{ ...styles.button, width: '100%', justifyContent: 'center' }}
-              disabled={loading || !uploadForm.name || !uploadForm.file}
-            >
-              {loading ? 'Upload en cours...' : 'Importer le fichier'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showCreateVizModal && selectedDataset && (
-        <div style={styles.modal} onClick={() => setShowCreateVizModal(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>📊 Créer une visualisation</h2>
-              <button onClick={() => setShowCreateVizModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            <label style={styles.label}>Titre de la visualisation</label>
-            <input
-              type="text"
-              style={styles.input}
-              placeholder="Ex: Médailles par pays"
-              value={vizForm.title}
-              onChange={(e) => setVizForm({ ...vizForm, title: e.target.value })}
-            />
-
-            <label style={styles.label}>Type de graphique</label>
-            <select
-              style={styles.select}
-              value={vizForm.chartType}
-              onChange={(e) => setVizForm({ ...vizForm, chartType: e.target.value })}
-            >
-              <option value="bar">📊 Graphique en barres</option>
-              <option value="pie">🥧 Camembert</option>
-              <option value="line">📈 Graphique en ligne</option>
-              <option value="scatter">⚫ Nuage de points</option>
-            </select>
-
-            <label style={styles.label}>Variable X (axe horizontal / catégorie)</label>
-            <select
-              style={styles.select}
-              value={vizForm.xAxis}
-              onChange={(e) => setVizForm({ ...vizForm, xAxis: e.target.value })}
-            >
-              <option value="">Sélectionner une variable</option>
-              {selectedDataset.datasetVariables?.map(variable => (
-                <option key={variable.id} value={variable.name}>
-                  {variable.name} ({variable.type})
-                </option>
-              ))}
-            </select>
-
-            <label style={styles.label}>Variable Y (axe vertical / valeur)</label>
-            <select
-              style={styles.select}
-              value={vizForm.yAxis}
-              onChange={(e) => setVizForm({ ...vizForm, yAxis: e.target.value })}
-            >
-              <option value="">Sélectionner une variable</option>
-              {selectedDataset.datasetVariables?.filter(v => v.type === 'numeric').map(variable => (
-                <option key={variable.id} value={variable.name}>
-                  {variable.name}
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={handleCreateVisualization}
-              style={{ ...styles.button, width: '100%', justifyContent: 'center' }}
-              disabled={loading || !vizForm.title || !vizForm.xAxis || !vizForm.yAxis}
-            >
-              {loading ? 'Création en cours...' : 'Créer la visualisation'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showViewVizModal && selectedViz && csvData.length > 0 && (
-        <div style={styles.modal} onClick={() => setShowViewVizModal(false)}>
-          <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ fontSize: '22px', color: '#333', margin: 0 }}>
-                {selectedViz.config.title || 'Visualisation'}
-              </h2>
-              <button onClick={() => setShowViewVizModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <X size={24} />
-              </button>
-            </div>
-
-            {renderChart(selectedViz, csvData)}
-
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Type:</strong> {selectedViz.chartType}
-              </p>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Variable X:</strong> {selectedViz.config.xAxis}
-              </p>
-              <p style={{ fontSize: '14px', color: '#666', margin: '5px 0' }}>
-                <strong>Variable Y:</strong> {selectedViz.config.yAxis}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POPUP */}
+      <Header_Component styles={styles} userRole={userRole} openModal={openModal} loadDatasetsFromDB={loadDatasetsFromDB} />
+      <DatasetsList_Component styles={styles} datasets={datasets} loading={loading} handleSelectDataset={handleSelectDataset} userRole={userRole} openModal={openModal} />
+      <VisualizationsSection_Component styles={styles} selectedDataset={selectedDataset} vizList={selectedDataset?.visualizations || []} openModal={openModal} CHART_TYPES={CHART_TYPES} setSelectedViz={setSelectedViz} />
+      <UploadModal_Component styles={styles} modals={modals} closeModal={closeModal} uploadName={uploadName} setUploadName={setUploadName} uploadFile={uploadFile} setUploadFile={setUploadFile} loading={loading} handleUploadDataset={handleUploadDataset} />
+      <CreateVizModal_Component styles={styles} modals={modals} closeModal={closeModal} selectedDataset={selectedDataset} vizForm={vizForm} setVizForm={setVizForm} CHART_TYPES={CHART_TYPES} loading={loading} handleCreateVisualization={handleCreateVisualization} COLORS={COLORS} />
+      <ViewVizModal_Component styles={styles} modals={modals} closeModal={closeModal} selectedViz={selectedViz} userRole={userRole} handleDeleteVisualization={handleDeleteVisualization} csvFormat={csvFormat} availableYears={availableYears} selectedYear={selectedYear} setSelectedYear={setSelectedYear} chartRowsLimit={chartRowsLimit} setChartRowsLimit={setChartRowsLimit} chartSortOrder={chartSortOrder} setChartSortOrder={setChartSortOrder} csvData={csvData} renderChart={renderChart} />
       <Popup
         isOpen={popup.isOpen}
         onClose={() => setPopup({ ...popup, isOpen: false })}
@@ -783,3 +919,410 @@ export default function OlympicsDataViz() {
     </div>
   );
 }
+
+// ========== COMPOSANTS EXTRAITS (en dehors du composant principal) ==========
+
+// Header principal
+const Header_Component = ({ styles, userRole, openModal, loadDatasetsFromDB }) => (
+  <div style={styles.header}>
+    <h1 style={styles.title}>📊 Visualisation de Données JO</h1>
+    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      {userRole === 'ROLE_DATA_PROVIDER' && (
+        <button
+          style={styles.buttonPrimary}
+          onClick={() => openModal('upload')}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <Upload size={20} /> Uploader un CSV
+        </button>
+      )}
+      <button
+        style={styles.buttonSuccess}
+        onClick={loadDatasetsFromDB}
+        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#229954'}
+        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#27ae60'}
+      >
+        <RefreshCw size={20} /> Actualiser
+      </button>
+    </div>
+  </div>
+);
+
+// Liste des datasets
+const DatasetsList_Component = ({ styles, datasets, loading, handleSelectDataset, userRole, openModal }) => (
+  <div>
+    <h2 style={styles.sectionTitle}>📁 Datasets enregistrés ({datasets.length})</h2>
+    {loading && datasets.length === 0 ? (
+      <div style={styles.loadingState}>
+        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+        <p style={{ fontSize: '16px' }}>Chargement des datasets...</p>
+      </div>
+    ) : datasets.length === 0 ? (
+      <div style={styles.emptyState}>
+        <div style={{ fontSize: '64px', marginBottom: '20px' }}>📦</div>
+        <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
+          Aucun dataset enregistré
+        </p>
+        <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px' }}>
+          Vérifiez que vous êtes connecté et que des datasets existent en base de données.
+        </p>
+        <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#edf2f7', borderRadius: '8px', borderLeft: '4px solid #4299e1' }}>
+          <p style={{ fontSize: '12px', color: '#2d3748', margin: 0 }}>
+            💡 Ouvrez la console (F12) pour voir les messages de debug
+          </p>
+        </div>
+        <button 
+          style={styles.buttonPrimary} 
+          onClick={() => {
+            console.log('🔄 Rechargement manuel des datasets...');
+            loadDatasetsFromDB();
+          }}
+        >
+          🔄 Recharger les datasets
+        </button>
+        {userRole === 'ROLE_DATA_PROVIDER' && (
+          <button style={{ ...styles.buttonPrimary, marginLeft: '10px', backgroundColor: '#48bb78' }} onClick={() => openModal('upload')}>
+            <Upload size={20} /> Uploader un CSV
+          </button>
+        )}
+      </div>
+    ) : (
+      <div style={styles.grid}>
+        {datasets.map(dataset => (
+          <div
+            key={dataset.id}
+            style={styles.card}
+            onClick={() => handleSelectDataset(dataset)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-4px)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+            }}
+          >
+            <h3 style={styles.cardTitle}>{dataset.name}</h3>
+            <p style={styles.cardText}>📄 {dataset.path.split('/').pop()}</p>
+            <p style={styles.cardText}>📊 {dataset.datasetVariables?.length || 0} variables</p>
+            <p style={styles.cardText}>📈 {dataset.visualizations?.length || 0} visualisations</p>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+);
+
+// Section des visualisations
+const VisualizationsSection_Component = ({ styles, selectedDataset, vizList, openModal, CHART_TYPES, setSelectedViz }) => {
+  if (!selectedDataset) return null;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+        <h2 style={styles.sectionTitle}>📈 Visualisations - {selectedDataset.name}</h2>
+        <button
+          style={styles.buttonPrimary}
+          onClick={() => openModal('createViz')}
+        >
+          <Plus size={20} /> Créer une visualisation
+        </button>
+      </div>
+
+      {vizList.length === 0 ? (
+        <div style={styles.emptyState}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>📊</div>
+          <p style={{ fontSize: '18px', color: '#4a5568', marginBottom: '24px', fontWeight: '500' }}>
+            Aucune visualisation créée
+          </p>
+          <button style={styles.buttonPrimary} onClick={() => openModal('createViz')}>
+            <Plus size={20} /> Créer la première visualisation
+          </button>
+        </div>
+      ) : (
+        <div style={styles.grid}>
+          {vizList.map(viz => (
+            <div
+              key={viz.id}
+              style={styles.card}
+              onClick={() => {
+                setSelectedViz(viz);
+                openModal('viewViz');
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+              }}
+            >
+              <div style={styles.cardTitle}>
+                {viz.chartType === 'bar' && <BarChart3 size={24} />}
+                {viz.chartType === 'line' && <TrendingUp size={24} />}
+                {viz.config.title || `Graphique ${viz.chartType}`}
+              </div>
+              <p style={styles.cardText}>
+                📊 Type: {CHART_TYPES.find(ct => ct.value === viz.chartType)?.label.split(' ').pop()}
+              </p>
+              <p style={styles.cardText}>📍 Variables: {viz.config.xAxis} / {viz.config.yAxis}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+  // Modale d'upload
+  const UploadModal_Component = ({ styles, modals, closeModal, uploadName, setUploadName, uploadFile, setUploadFile, loading, handleUploadDataset }) => {
+  if (!modals.upload) return null;
+
+  return (
+    <div style={styles.modal} onClick={() => closeModal('upload')}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>📤 Uploader un CSV</h2>
+          <button
+            onClick={() => closeModal('upload')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+          >
+            <X size={28} color="#718096" />
+          </button>
+        </div>
+
+        <p style={{ fontSize: '14px', color: '#718096', marginBottom: '24px', lineHeight: '1.6' }}>
+          Sélectionnez un fichier CSV à uploader. Le fichier sera stocké dans{' '}
+          <code style={{ backgroundColor: '#f7fafc', padding: '2px 6px', borderRadius: '4px', fontSize: '13px' }}>
+            public/datasets/
+          </code>
+        </p>
+
+        <label style={styles.label}>Nom du dataset</label>
+        <input
+          type="text"
+          style={styles.input}
+          placeholder="Ex: Médailles Olympiques"
+          value={uploadName}
+          onChange={(e) => setUploadName(e.target.value)}
+        />
+
+        <label style={styles.label}>Fichier CSV</label>
+        <input
+          type="file"
+          accept=".csv"
+          style={styles.input}
+          onChange={(e) => setUploadFile(e.target.files[0])}
+        />
+
+        {uploadFile && (
+          <div style={styles.infoBox}>
+            <p style={{ fontSize: '15px', color: '#2d3748', margin: '0 0 8px 0', fontWeight: '600' }}>
+              📄 {uploadFile.name}
+            </p>
+            <p style={{ fontSize: '14px', color: '#718096', margin: 0 }}>
+              Taille: {(uploadFile.size / 1024).toFixed(1)} KB
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={handleUploadDataset}
+          style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '8px' }}
+          disabled={loading || !uploadFile || !uploadName.trim()}
+        >
+          {loading ? '⏳ Upload...' : '✅ Uploader le CSV'}
+        </button>
+      </div>
+    </div>
+  );
+};
+const CreateVizModal_Component = ({ styles, modals, closeModal, selectedDataset, vizForm, setVizForm, CHART_TYPES, loading, handleCreateVisualization, COLORS }) => (
+  modals.createViz && selectedDataset ? (
+    <div style={styles.modal} onClick={() => closeModal('createViz')}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>📊 Créer une visualisation</h2>
+          <button
+            onClick={() => closeModal('createViz')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+          >
+            <X size={28} color="#718096" />
+          </button>
+        </div>
+
+        <label style={styles.label}>Titre de la visualisation</label>
+        <input
+          type="text"
+          style={styles.input}
+          placeholder="Ex: Médailles d'or par pays"
+          value={vizForm.title}
+          onChange={(e) => setVizForm({ ...vizForm, title: e.target.value })}
+        />
+
+        <label style={styles.label}>Type de graphique</label>
+        <select
+          style={styles.select}
+          value={vizForm.chartType}
+          onChange={(e) => setVizForm({ ...vizForm, chartType: e.target.value })}
+        >
+          {CHART_TYPES.map(ct => (
+            <option key={ct.value} value={ct.value}>
+              {ct.label}
+            </option>
+          ))}
+        </select>
+
+        <label style={styles.label}>Variable X (axe horizontal / catégorie)</label>
+        <select
+          style={styles.select}
+          value={vizForm.xAxis}
+          onChange={(e) => setVizForm({ ...vizForm, xAxis: e.target.value })}
+        >
+          <option value="">Sélectionner une variable</option>
+          {selectedDataset.datasetVariables?.map(variable => (
+            <option key={variable.id} value={variable.name}>
+              {variable.name} ({variable.type})
+            </option>
+          ))}
+        </select>
+
+        <label style={styles.label}>Variable Y (axe vertical / valeur numérique)</label>
+        <select
+          style={styles.select}
+          value={vizForm.yAxis}
+          onChange={(e) => setVizForm({ ...vizForm, yAxis: e.target.value })}
+        >
+          <option value="">Sélectionner une variable</option>
+          {selectedDataset.datasetVariables?.filter(v => v.type === 'numeric').map(variable => (
+            <option key={variable.id} value={variable.name}>
+              {variable.name}
+            </option>
+          ))}
+        </select>
+
+        <button
+          onClick={handleCreateVisualization}
+          style={{ ...styles.buttonPrimary, width: '100%', justifyContent: 'center', marginTop: '16px' }}
+          disabled={!vizForm.xAxis || !vizForm.yAxis || loading}
+        >
+          {loading ? '⏳ Création...' : '✅ Créer la visualisation'}
+        </button>
+      </div>
+    </div>
+  ) : null
+);
+
+// Modale de visualisation
+const ViewVizModal_Component = ({ styles, modals, closeModal, selectedViz, userRole, handleDeleteVisualization, csvFormat, availableYears, selectedYear, setSelectedYear, chartRowsLimit, setChartRowsLimit, chartSortOrder, setChartSortOrder, csvData, renderChart }) => {
+  if (!modals.viewViz || !selectedViz) return null;
+
+  return (
+    <div style={styles.modal} onClick={() => closeModal('viewViz')}>
+      <div style={styles.modalContentLarge} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>{selectedViz.config?.title || 'Visualisation'}</h2>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {(userRole === 'ROLE_DATA_PROVIDER' || userRole === 'ROLE_ADMIN') && (
+              <button
+                onClick={() => handleDeleteVisualization(selectedViz.id)}
+                style={{ ...styles.buttonPrimary, backgroundColor: '#e53e3e', padding: '8px 12px' }}
+                title="Supprimer cette visualisation"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            <button
+              onClick={() => closeModal('viewViz')}
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={28} color="#718096" />
+            </button>
+          </div>
+        </div>
+
+        {/* Contrôles pour l'affichage du graphique */}
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', padding: '16px', backgroundColor: '#f7fafc', borderRadius: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Filtre d'année si applicable */}
+          {csvFormat === 'yearly' && availableYears.length > 0 && (
+            <div>
+              <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+                📅 Année:
+              </label>
+              <select
+                value={selectedYear || ''}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                style={{
+                  padding: '8px 12px',
+                  border: '2px solid #cbd5e0',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  backgroundColor: 'white'
+                }}
+              >
+                {availableYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          <div>
+            <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+              📊 Nombre de lignes:
+            </label>
+            <select
+              value={chartRowsLimit}
+              onChange={(e) => setChartRowsLimit(parseInt(e.target.value))}
+              style={{
+                padding: '8px 12px',
+                border: '2px solid #cbd5e0',
+                borderRadius: '6px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                backgroundColor: 'white'
+              }}
+            >
+              <option value={15}>Top 15</option>
+              <option value={30}>Top 30</option>
+              <option value={50}>Top 50</option>
+              <option value={100}>Top 100</option>
+              <option value={9999}>Toutes les données ({csvData.length})</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
+              📈 Tri:
+            </label>
+            <select
+              value={chartSortOrder}
+              onChange={(e) => setChartSortOrder(e.target.value)}
+              style={{
+                padding: '8px 12px',
+                border: '2px solid #cbd5e0',
+                borderRadius: '6px',
+                fontSize: '14px',
+                cursor: 'pointer',
+                backgroundColor: 'white'
+              }}
+            >
+              <option value="none">Aucun tri</option>
+              <option value="asc">Croissant ↑</option>
+              <option value="desc">Décroissant ↓</option>
+            </select>
+          </div>
+        </div>
+
+        {csvData.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#718096' }}>Aucune donnée chargée</p>
+        ) : (
+          renderChart(selectedViz, csvData)
+        )}
+      </div>
+    </div>
+  );
+};

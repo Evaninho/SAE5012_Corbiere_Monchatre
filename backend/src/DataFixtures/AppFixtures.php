@@ -97,14 +97,25 @@ class AppFixtures extends Fixture
         $chartTypes = ["bar", "line", "pie", "scatter"];
 
         for ($i = 0; $i < 10; $i++) {
+            $dataset = $faker->randomElement($datasets);
+            $datasetVariables = $dataset->getDatasetVariables()->toArray();
+
+            // Get categorical and numeric variables
+            $categoricalVars = array_filter($datasetVariables, fn($v) => $v->getType() === 'string');
+            $numericVars = array_filter($datasetVariables, fn($v) => $v->getType() !== 'string');
+
+            $xVar = !empty($categoricalVars) ? $faker->randomElement($categoricalVars)->getName() : "Variable_1_1";
+            $yVar = !empty($numericVars) ? $faker->randomElement($numericVars)->getName() : "Variable_1_2";
+
             $viz = new Visualization();
             $viz->setChartType($faker->randomElement($chartTypes));
             $viz->setConfig([
                 "title" => "Graphique " . ($i + 1),
-                "x" => "Variable X",
-                "y" => "Variable Y"
+                "xAxis" => $xVar,
+                "yAxis" => $yVar,
+                "colors" => ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"]
             ]);
-            $viz->setDataset($faker->randomElement($datasets));
+            $viz->setDataset($dataset);
 
             $manager->persist($viz);
             $visualizations[] = $viz;

@@ -12,9 +12,9 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: DatasetRepository::class)]
 #[ApiResource(
     operations: [
-        new Get(),
-        new GetCollection(),
-        new Post(security: "is_granted('ROLE_DATA_PROVIDER')"),
+        new Get(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
+        new GetCollection(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
+        new Post(security: "is_granted('ROLE_USER') or is_granted('ROLE_DATA_PROVIDER')"),
         new Put(security: "object.getUploadedBy() == user or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')"),
         new Delete(security: "is_granted('ROLE_ADMIN')")
     ],

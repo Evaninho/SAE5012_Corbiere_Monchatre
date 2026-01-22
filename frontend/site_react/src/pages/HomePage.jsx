@@ -1,7 +1,11 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Trophy, BarChart3, Newspaper, Play } from "lucide-react";
-import Fondimg from "../components/image/fondAccueil.webp";
+import Fondimg from "../components/image/JO OLYMPEAK.png";
+import CarrefourLogo from "../../public/images/Carrefour.svg";
+import EDFLogo from "../../public/images/Edf.png";
+import AllianzLogo from "../../public/images/Allianz.png";
+import DecathlonLogo from "../../public/images/Decathlon.png";
 
 export function HomePage() {
     const navigate = useNavigate();
@@ -82,59 +86,6 @@ export function HomePage() {
         color: "#555"
     };
 
-    const podiumContainerStyle = {
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-end",
-        gap: "30px",
-        marginTop: "40px"
-    };
-
-    const podiumPlaceStyle = (height, color, isFirst) => ({
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        order: isFirst ? 2 : 1
-    });
-
-    const medalStyle = {
-        width: "80px",
-        height: "80px",
-        borderRadius: "50%",
-        backgroundColor: "#FFD700",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "32px",
-        fontWeight: "bold",
-        color: "white",
-        marginBottom: "15px",
-        boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)"
-    };
-
-    const podiumBarStyle = (height, color) => ({
-        width: "120px",
-        height: height,
-        backgroundColor: color,
-        borderTopLeftRadius: "10px",
-        borderTopRightRadius: "10px",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        color: "white",
-        fontWeight: "bold"
-    });
-
-    const countryNameStyle = {
-        fontSize: "16px",
-        marginBottom: "5px"
-    };
-
-    const medalsCountStyle = {
-        fontSize: "28px"
-    };
-
     const quickAccessStyle = {
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
@@ -177,9 +128,8 @@ export function HomePage() {
     };
 
     const gamesSectionStyle = {
-        backgroundColor: "#f9f9f9",
         borderRadius: "15px",
-        padding: "40px 20px"
+        padding: "40px 80px"
     };
 
     const gamesTitleStyle = {
@@ -258,23 +208,22 @@ export function HomePage() {
         marginTop: "30px"
     };
 
-    const partnerCardStyle = {
-        backgroundColor: "#e5e7eb",
-        borderRadius: "15px",
-        height: "120px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#9ca3af",
-        fontSize: "14px",
-        fontWeight: "500"
+
+   const partnerCardStyle = {
+    backgroundColor: "white",
+    borderRadius: "15px",
+    height: "120px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)"
     };
 
-    const podiumData = [
-        { place: 2, country: "France", medals: 64, height: "160px", color: "#0085C7" },
-        { place: 1, country: "États-Unis", medals: 126, height: "200px", color: "#FFD700" },
-        { place: 3, country: "Chine", medals: 91, height: "120px", color: "#CD7F32" }
-    ];
+    const partnerLogoStyle = {
+        maxWidth: "120px",
+        maxHeight: "60px",
+        objectFit: "contain"
+    };
 
     const gamesData = [
         { 
@@ -301,7 +250,6 @@ export function HomePage() {
         <div style={pageStyle}>
             <div style={AccueilStyle}>
                 <img src={Fondimg} alt="Fond d'accueil" style={fondAccueilStyle} />
-                <h1 style={NamePage}>Olympeak</h1>
             </div>
             
 
@@ -315,26 +263,6 @@ export function HomePage() {
                             suivez les actualités des athlètes et explorez l'histoire olympique 
                             à travers des données interactives et des articles passionnants.
                         </p>
-                    </div>
-                </section>
-
-                <section style={sectionStyle}>
-                    <h2 style={sectionTitle}>Podium des Nations</h2>
-                    <div style={podiumContainerStyle}>
-                        {podiumData.map((item) => (
-                            <div 
-                                key={item.place}
-                                style={podiumPlaceStyle(item.height, item.color, item.place === 1)}
-                            >
-                                <div style={medalStyle}>
-                                    {item.place}
-                                </div>
-                                <div style={podiumBarStyle(item.height, item.color)}>
-                                    <span style={countryNameStyle}>{item.country}</span>
-                                    <span style={medalsCountStyle}>{item.medals}</span>
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </section>
 
@@ -424,11 +352,21 @@ export function HomePage() {
                 <section style={sectionStyle}>
                     <h2 style={sectionTitle}>Nos Partenaires</h2>
                     <div style={partnersGridStyle}>
-                        {[1, 2, 3, 4].map((i) => (
-                            <div key={i} style={partnerCardStyle}>
-                                Logo {i}
-                            </div>
-                        ))}
+                        <div style={partnerCardStyle}>
+                            <img src={CarrefourLogo} alt="Carrefour" style={partnerLogoStyle} />
+                        </div>
+
+                        <div style={partnerCardStyle}>
+                            <img src={EDFLogo} alt="EDF" style={partnerLogoStyle} />
+                        </div>
+
+                        <div style={partnerCardStyle}>
+                            <img src={AllianzLogo} alt="Allianz" style={partnerLogoStyle} />
+                        </div>
+
+                        <div style={partnerCardStyle}>
+                            <img src={DecathlonLogo} alt="Decathlon" style={partnerLogoStyle} />
+                        </div>
                     </div>
                 </section>
             </div>
