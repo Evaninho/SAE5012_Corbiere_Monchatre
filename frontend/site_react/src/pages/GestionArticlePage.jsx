@@ -4,7 +4,7 @@ import { Trash2, Edit, Eye, Search, AlertTriangle, ArrowLeft, Loader, X, Plus, A
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Popup } from '../components/Popup';
 import { ImageBlock } from '../components/common/ImageBlock';
-import { VisualizationBlockEditable } from '../components/common/VisualizationBlockEditable';
+import { VisualizationBlock } from '../components/common/VisualizationBlock';
 import { ChartRenderer } from '../components/common/ChartRenderer';
 import { SearchBar } from '../components/common/SearchBar';
 import { LoadingScreen } from '../utils/LoadingScreen';
@@ -68,7 +68,7 @@ export function GestionArticlesPage() {
         'Content-Type': 'application/ld+json',
         'Accept': 'application/ld+json'
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
@@ -77,7 +77,7 @@ export function GestionArticlesPage() {
         method: 'GET',
         headers
       });
-      
+
       if (!response.ok) {
         console.error(`Erreur HTTP ${response.status}:`, response.statusText);
         throw new Error(`Erreur HTTP ${response.status}`);
@@ -92,7 +92,7 @@ export function GestionArticlesPage() {
           // Si dataset manque mais on a un datasetId ou dataset.id existe
           const hasDataset = viz.dataset && viz.dataset.id;
           const hasDatasetId = viz.datasetId || (viz.dataset && typeof viz.dataset === 'string');
-          
+
           if (!hasDataset && (hasDatasetId)) {
             try {
               const actualDatasetId = viz.datasetId || viz.dataset;
@@ -143,11 +143,13 @@ export function GestionArticlesPage() {
   const [showMediaLibrary, setShowMediaLibrary] = useState(null);
   const [mediaLibrary, setMediaLibrary] = useState([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
-  
+
+  const [blocks, setBlocks] = useState([]);
+
   const [showVisualizationLibrary, setShowVisualizationLibrary] = useState(null);
   const [visualizations, setVisualizations] = useState([]);
   const [loadingVisualizations, setLoadingVisualizations] = useState(false);
-  
+
   const [popup, setPopup] = useState({
     isOpen: false,
     type: 'info',
@@ -350,13 +352,13 @@ export function GestionArticlesPage() {
         },
         body: JSON.stringify(data)
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Erreur réponse serveur:', { status: response.status, text: errorText });
         throw new Error(`Erreur ${response.status}: ${errorText || 'Modification échouée'}`);
       }
-      
+
       const result = await response.json();
       console.log('Mise à jour réussie:', result);
       return result;
@@ -407,14 +409,14 @@ export function GestionArticlesPage() {
     setIsLoadingArticle(true);
     setArticleToEdit(article);
     setShowEditModal(true);
-    
+
     try {
       // Récupérer les détails complets de l'article avec les blocs
       const response = await fetch(`${API_BASE_URL}/articles/${article.id}`);
       if (!response.ok) throw new Error('Erreur de chargement');
-      
+
       const fullArticle = await response.json();
-      
+
       // Cloner les blocs existants en s'assurant que le contenu est bien préservé
       const blocksToEdit = (fullArticle.blocks || [])
         .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
@@ -424,7 +426,7 @@ export function GestionArticlesPage() {
           orderIndex: b.orderIndex || 0,
           content: { ...b.content } // Cloner le contenu
         }));
-      
+
       setEditFormData({
         title: fullArticle.title,
         blocks: blocksToEdit
@@ -474,12 +476,12 @@ export function GestionArticlesPage() {
           orderIndex: block.orderIndex,
           content: block.content
         };
-        
+
         // Ajouter l'ID seulement pour les blocs existants (ID < 1700000000000 = avant Date.now())
         if (typeof block.id === 'number' && block.id < 1700000000000) {
           blockData.id = block.id;
         }
-        
+
         return blockData;
       });
 
@@ -490,7 +492,7 @@ export function GestionArticlesPage() {
         content: generatedContent,
         blocks: blocksToSend
       };
-      
+
       console.log('Données PATCH à envoyer:', patchData);
       updateMutation.mutate({
         id: articleToEdit.id,
@@ -532,12 +534,12 @@ export function GestionArticlesPage() {
     const newBlocks = [...editFormData.blocks];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= newBlocks.length) return;
-    
+
     [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
     newBlocks.forEach((block, idx) => {
       block.orderIndex = idx;
     });
-    
+
     setEditFormData({ ...editFormData, blocks: newBlocks });
   };
 
@@ -568,17 +570,27 @@ export function GestionArticlesPage() {
     setShowMediaLibrary(null);
   };
 
+  const selectVisualization = (blockId, visualizationId) => {
+    updateBlockContent(blockId, { visualizationId });
+    setShowVisualizationLibrary(null);
+  };
+
+
   // Supprimer l'image du block
   const removeImageFromBlock = (blockId) => {
     updateBlockContent(blockId, { url: '' });
   };
 
+  const removeVisualizationFromBlock = (blockId) => {
+    updateBlockContent(blockId, { visualizationId: null });
+  };
+
   if (isLoading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'column',
         gap: '20px'
@@ -620,12 +632,12 @@ export function GestionArticlesPage() {
               <ArrowLeft size={18} />
               Retour
             </button>
-            <h1 style={{...titleStyle, marginTop: '15px'}}>Gestion des Articles</h1>
+            <h1 style={{ ...titleStyle, marginTop: '15px' }}>Gestion des Articles</h1>
           </div>
         </div>
 
         {/* Filtres */}
-        <SearchBar 
+        <SearchBar
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           placeholder="Rechercher un article ou un auteur..."
@@ -859,14 +871,16 @@ export function GestionArticlesPage() {
                     )}
 
                     {block.type === 'visualization' && (
-                      <VisualizationBlockEditable
+                      <VisualizationBlock
                         blockId={block.id}
-                        visualizationId={block.content.visualizationId}
+                        visualizationId={block.content?.visualizationId}
                         visualizations={visualizations}
                         loadingVisualizations={loadingVisualizations}
-                        onVisualizationSelect={() => setShowVisualizationLibrary(block.id)}
-                        onRemoveVisualization={() => removeBlock(block.id)}
-                        onOpenMediaLibrary={() => setShowVisualizationLibrary(block.id)}
+                        onOpenMediaLibrary={setShowVisualizationLibrary}
+                        onRemove={removeVisualizationFromBlock}
+                        height={350}
+                        showTitle={true}
+                        editable={true}
                       />
                     )}
                   </div>
@@ -887,8 +901,11 @@ export function GestionArticlesPage() {
                       fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e0f2fe'}
                   >
                     <Plus size={16} /> Texte
                   </button>
@@ -905,8 +922,11 @@ export function GestionArticlesPage() {
                       fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#bfdbfe'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dbeafe'}
                   >
                     <Plus size={16} /> Image
                   </button>
@@ -914,8 +934,8 @@ export function GestionArticlesPage() {
                     onClick={() => addBlock('visualization')}
                     style={{
                       padding: '10px 15px',
-                      backgroundColor: '#fed7aa',
-                      color: '#ea580c',
+                      backgroundColor: '#fef3e0',
+                      color: '#FF9800',
                       border: 'none',
                       borderRadius: '8px',
                       cursor: 'pointer',
@@ -923,10 +943,14 @@ export function GestionArticlesPage() {
                       fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fde5b4'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fef3e0'}
                   >
-                    <Plus size={16} /> Visualisation
+                    <BarChart3 size={18} />
+                    Visualisation
                   </button>
                 </div>
 
@@ -1123,8 +1147,7 @@ export function GestionArticlesPage() {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(5px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1182,8 +1205,7 @@ export function GestionArticlesPage() {
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
                 {visualizations.map((viz) => {
-                  const currentBlock = editFormData.blocks.find(b => b.id === showVisualizationLibrary);
-                  const isSelected = currentBlock?.content?.visualizationId === viz.id;
+                  const isSelected = editFormData.blocks.find(b => b.id === showVisualizationLibrary)?.content?.visualizationId === viz.id;
 
                   return (
                     <div
@@ -1200,20 +1222,7 @@ export function GestionArticlesPage() {
                         gap: '10px',
                         position: 'relative'
                       }}
-                      onClick={() => {
-                        const block = editFormData.blocks.find(b => b.id === showVisualizationLibrary);
-                        if (block) {
-                          setEditFormData({
-                            ...editFormData,
-                            blocks: editFormData.blocks.map(b =>
-                              b.id === showVisualizationLibrary
-                                ? { ...b, content: { ...b.content, visualizationId: viz.id } }
-                                : b
-                            )
-                          });
-                          setShowVisualizationLibrary(null);
-                        }
-                      }}
+                      onClick={() => selectVisualization(showVisualizationLibrary, viz.id)}
                       onMouseEnter={(e) => {
                         if (!isSelected) {
                           e.currentTarget.style.borderColor = '#FF9800';
@@ -1255,7 +1264,6 @@ export function GestionArticlesPage() {
                           </div>
                         )}
                       </div>
-
                       {/* Aperçu du graphique */}
                       <div style={{
                         backgroundColor: 'white',
@@ -1280,7 +1288,9 @@ export function GestionArticlesPage() {
             )}
           </div>
         </div>
-      )}
+      )
+      }
+
 
       {/* POPUP */}
       <Popup
@@ -1290,6 +1300,6 @@ export function GestionArticlesPage() {
         title={popup.title}
         message={popup.message}
       />
-    </div>
+    </div >
   );
 }

@@ -73,11 +73,11 @@ export function ChartRenderer({ visualization, height = 350 }) {
         return;
       }
       
-      console.log(`📥 Chargement du CSV pour datasetId: ${datasetId}`);
+      // console.log(`📥 Chargement du CSV pour datasetId: ${datasetId}`);
       
       // Utiliser l'endpoint /download comme dans StatsPage (évite les problèmes d'URL)
       const csvUrl = `${API_BASE}/datasets/${datasetId}/download`;
-      console.log(`📍 URL CSV:`, csvUrl);
+      // console.log(`📍 URL CSV:`, csvUrl);
       
       // Headers spécifiques pour le téléchargement CSV
       const csvHeaders = {
@@ -88,7 +88,7 @@ export function ChartRenderer({ visualization, height = 350 }) {
         csvHeaders['Authorization'] = `Bearer ${token}`;
       }
       
-      console.log('📤 Headers:', csvHeaders);
+      // console.log('📤 Headers:', csvHeaders);
       
       const csvResponse = await fetch(csvUrl, {
         headers: csvHeaders
@@ -100,7 +100,7 @@ export function ChartRenderer({ visualization, height = 350 }) {
         throw new Error(`Erreur chargement CSV: ${csvResponse.status}`);
       }
 
-      console.log('✅ CSV téléchargé avec succès');
+      // console.log('✅ CSV téléchargé avec succès');
       const csvText = await csvResponse.text();
       
       // Parser le CSV avec Papa.parse (comme dans StatsPage)

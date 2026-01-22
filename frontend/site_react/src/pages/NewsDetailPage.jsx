@@ -355,7 +355,7 @@ export function NewsDetailPage() {
         'Content-Type': 'application/ld+json',
         'Accept': 'application/ld+json'
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
@@ -364,7 +364,7 @@ export function NewsDetailPage() {
         method: 'GET',
         headers
       });
-      
+
       if (!response.ok) {
         console.error(`Erreur HTTP ${response.status}:`, response.statusText);
         throw new Error(`Erreur HTTP ${response.status}`);
@@ -379,7 +379,7 @@ export function NewsDetailPage() {
           // Si dataset manque mais on a un datasetId ou dataset.id existe
           const hasDataset = viz.dataset && viz.dataset.id;
           const hasDatasetId = viz.datasetId || (viz.dataset && typeof viz.dataset === 'string');
-          
+
           if (!hasDataset && (hasDatasetId)) {
             try {
               const actualDatasetId = viz.datasetId || viz.dataset;
@@ -432,11 +432,11 @@ export function NewsDetailPage() {
     if (!newComment.trim() && newStars === 0) return;
 
     setIsSubmitting(true);
-    
+
 
     try {
       const token = getToken();
-      
+
       // Décoder le JWT pour voir les rôles
       if (token) {
         const decoded = JSON.parse(atob(token.split('.')[1]));
@@ -465,14 +465,14 @@ export function NewsDetailPage() {
       }
 
       const newRating = await response.json();
-      
+
       setNewComment("");
       setNewStars(0);
       setHoveredStar(0);
-      
+
       // Ajouter le nouveau rating à la liste sans recharger
       setRatings([...ratings, newRating]);
-      
+
       // Recalculer la moyenne
       const allRatings = [...ratings, newRating];
       const withStars = allRatings.filter(r => r.stars > 0);
@@ -505,25 +505,25 @@ export function NewsDetailPage() {
   // Vérifier les permissions
   const canEdit = () => {
     if (!article) return false;
-    
+
     // EDITOR et ADMIN peuvent tout modifier
     if (userRole === 'ROLE_EDITOR' || userRole === 'ROLE_ADMIN') return true;
-    
+
     // AUTHOR peut modifier ses propres articles (comparer en string pour éviter les problèmes de type)
     if (userRole === 'ROLE_AUTHOR' && String(userId) === String(article.author?.id)) return true;
-    
+
     return false;
   };
 
   const canDelete = () => {
     if (!article) return false;
-    
+
     // EDITOR et ADMIN peuvent tout supprimer
     if (userRole === 'ROLE_EDITOR' || userRole === 'ROLE_ADMIN') return true;
-    
+
     // AUTHOR peut supprimer ses propres articles (comparer en string pour éviter les problèmes de type)
     if (userRole === 'ROLE_AUTHOR' && String(userId) === String(article.author?.id)) return true;
-    
+
     return false;
   };
 
@@ -535,13 +535,13 @@ export function NewsDetailPage() {
   const handleEdit = async () => {
     setIsLoadingArticle(true);
     setShowEditModal(true);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/articles/${id}`);
       if (!response.ok) throw new Error('Erreur de chargement');
-      
+
       const fullArticle = await response.json();
-      
+
       const blocksToEdit = (fullArticle.blocks || [])
         .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
         .map(b => ({
@@ -550,7 +550,7 @@ export function NewsDetailPage() {
           orderIndex: b.orderIndex || 0,
           content: { ...b.content }
         }));
-      
+
       setEditFormData({
         title: fullArticle.title,
         blocks: blocksToEdit
@@ -574,7 +574,7 @@ export function NewsDetailPage() {
       id: Date.now(),
       type: type,
       orderIndex: editFormData.blocks.length,
-      content: type === 'text' ? { text: '' } : { url: '' }
+      content: type === 'text' ? { text: '' } : type === 'image' ? { url: '' } : type === 'visualization' ? { visualizationId: null } : {}
     };
     setEditFormData({
       ...editFormData,
@@ -593,12 +593,12 @@ export function NewsDetailPage() {
     const newBlocks = [...editFormData.blocks];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= newBlocks.length) return;
-    
+
     [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
     newBlocks.forEach((block, idx) => {
       block.orderIndex = idx;
     });
-    
+
     setEditFormData({ ...editFormData, blocks: newBlocks });
   };
 
@@ -634,14 +634,25 @@ export function NewsDetailPage() {
     setShowMediaLibrary(null);
   };
 
+  const selectVisualization = (blockId, visualizationId) => {
+    updateBlockContent(blockId, { visualizationId });
+    setShowVisualizationLibrary(null);
+  };
+
+
   const removeImageFromBlock = (blockId) => {
     updateBlockContent(blockId, { url: '' });
   };
 
+  const removeVisualizationFromBlock = (blockId) => {
+    updateBlockContent(blockId, { visualizationId: null });
+  };
+
+
   // Sauvegarder modifications
   const handleSaveEdit = async () => {
     setIsLoadingArticle(true);
-    
+
     try {
       if (!editFormData.title.trim()) {
         setPopup({
@@ -670,11 +681,11 @@ export function NewsDetailPage() {
           orderIndex: block.orderIndex,
           content: block.content
         };
-        
+
         if (typeof block.id === 'number' && block.id < 1700000000000) {
           blockData.id = block.id;
         }
-        
+
         return blockData;
       });
 
@@ -692,7 +703,7 @@ export function NewsDetailPage() {
         },
         body: JSON.stringify(patchData)
       });
-      
+
       if (!response.ok) {
         throw new Error('Erreur lors de la modification');
       }
@@ -733,7 +744,7 @@ export function NewsDetailPage() {
       if (!response.ok) throw new Error('Erreur lors de la suppression');
 
       setShowDeleteModal(false);
-      
+
       setPopup({
         isOpen: true,
         type: 'success',
@@ -768,7 +779,7 @@ export function NewsDetailPage() {
   // ===== Modification d'un rating =====
   const handleEditRating = async (ratingId) => {
     setLoadingRatingId(ratingId);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/ratings/${ratingId}`, {
         method: 'PATCH',
@@ -783,15 +794,15 @@ export function NewsDetailPage() {
         if (response.status === 403) {
           throw new Error('Vous n\'avez pas le droit de modifier ce commentaire');
         }
-        throw new Error('statu : ' +response.status+ ' ' +'Erreur lors de la modification');
+        throw new Error('statu : ' + response.status + ' ' + 'Erreur lors de la modification');
       }
 
       const updatedRating = await response.json();
-      
+
       // Mettre à jour les ratings localement
       setRatings(ratings.map(r => r.id === ratingId ? updatedRating : r));
       setEditingRatingId(null);
-      
+
       setPopup({
         isOpen: true,
         type: 'success',
@@ -814,7 +825,7 @@ export function NewsDetailPage() {
   // ===== Suppression d'un rating =====
   const handleDeleteRating = async (ratingId) => {
     setDeletingRatingId(ratingId);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/ratings/${ratingId}`, {
         method: 'DELETE',
@@ -832,7 +843,7 @@ export function NewsDetailPage() {
 
       // Supprimer le rating localement
       setRatings(ratings.filter(r => r.id !== ratingId));
-      
+
       setPopup({
         isOpen: true,
         type: 'success',
@@ -918,7 +929,7 @@ export function NewsDetailPage() {
                   Modifier
                 </button>
               )}
-              
+
               {deletePermission && (
                 <button
                   onClick={() => setShowDeleteModal(true)}
@@ -960,8 +971,8 @@ export function NewsDetailPage() {
             </div>
 
             {/* PARTAGER */}
-            <button 
-              onClick={handleShare} 
+            <button
+              onClick={handleShare}
               style={{ ...styles.actionButton, backgroundColor: '#f3f4f6', color: '#666' }}
             >
               <Share2 size={18} />
@@ -1048,7 +1059,7 @@ export function NewsDetailPage() {
                       Modifier
                     </button>
                   )}
-                  
+
                   {/* Bouton Supprimer - visible pour créateur, EDITOR, ADMIN */}
                   {canDeleteRating(rating) && (
                     <button
@@ -1100,7 +1111,7 @@ export function NewsDetailPage() {
           {isLoggedIn ? (
             <div style={{ marginTop: '30px', borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
               <h3 style={{ fontSize: '18px', marginBottom: '15px', fontWeight: '600' }}>Laisser un commentaire</h3>
-              
+
               {/* Étoiles */}
               <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
                 {[1, 2, 3, 4, 5].map(star => (
@@ -1133,7 +1144,7 @@ export function NewsDetailPage() {
                 onBlur={(e) => e.target.style.borderColor = '#D9D9D9'}
               />
 
-              <button 
+              <button
                 onClick={handleAddComment}
                 disabled={isSubmitting}
                 style={{
@@ -1153,10 +1164,10 @@ export function NewsDetailPage() {
               </button>
             </div>
           ) : (
-            <div style={{ 
-              marginTop: '30px', 
-              padding: '20px', 
-              backgroundColor: '#f9fafb', 
+            <div style={{
+              marginTop: '30px',
+              padding: '20px',
+              backgroundColor: '#f9fafb',
               borderRadius: '10px',
               textAlign: 'center'
             }}>
@@ -1347,9 +1358,9 @@ export function NewsDetailPage() {
           <div style={styles.editModalStyle} onClick={(e) => e.stopPropagation()}>
             {isLoadingArticle ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '25px' }}>
-                <div style={{ 
-                  width: '56px', 
-                  height: '56px', 
+                <div style={{
+                  width: '56px',
+                  height: '56px',
                   border: '4px solid #e5e7eb',
                   borderTop: '4px solid #0085C7',
                   borderRadius: '50%',
@@ -1456,6 +1467,19 @@ export function NewsDetailPage() {
                         onOpenMediaLibrary={openMediaLibrary}
                       />
                     )}
+                    {block.type === 'visualization' && (
+                      <VisualizationBlock
+                        blockId={block.id}
+                        visualizationId={block.content?.visualizationId}
+                        visualizations={visualizations}
+                        loadingVisualizations={loadingVisualizations}
+                        onOpenMediaLibrary={setShowVisualizationLibrary}
+                        onRemove={removeVisualizationFromBlock}
+                        height={350}
+                        showTitle={true}
+                        editable={true}
+                      />
+                    )}
                   </div>
                 ))}
 
@@ -1473,8 +1497,11 @@ export function NewsDetailPage() {
                       fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#e0f2fe'}
                   >
                     <Plus size={16} /> Texte
                   </button>
@@ -1491,10 +1518,35 @@ export function NewsDetailPage() {
                       fontWeight: '600',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '5px'
+                      gap: '5px',
+                      transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#bfdbfe'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#dbeafe'}
                   >
                     <Plus size={16} /> Image
+                  </button>
+                  <button
+                    onClick={() => addBlock('visualization')}
+                    style={{
+                      padding: '10px 15px',
+                      backgroundColor: '#fef3e0',
+                      color: '#FF9800',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fde5b4'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fef3e0'}
+                  >
+                    <BarChart3 size={18} />
+                    Visualisation
                   </button>
                 </div>
 
@@ -1582,9 +1634,9 @@ export function NewsDetailPage() {
 
             {loadingMedia ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', gap: '15px' }}>
-                <div style={{ 
-                  width: '48px', 
-                  height: '48px', 
+                <div style={{
+                  width: '48px',
+                  height: '48px',
                   border: '3px solid #e5e7eb',
                   borderTop: '3px solid #0085C7',
                   borderRadius: '50%',
@@ -1648,6 +1700,158 @@ export function NewsDetailPage() {
                           ✓
                         </div>
                       )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )};
+
+      {/* MODAL MÉDIATHÈQUE VISUALISATIONS */}
+      {showVisualizationLibrary !== null && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+            padding: '20px',
+            overflowY: 'auto'
+          }}
+          onClick={() => setShowVisualizationLibrary(null)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '15px',
+              padding: '30px',
+              maxWidth: '900px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#FF9800' }}>
+                📊 Visualisations ({visualizations.length} visualization{visualizations.length > 1 ? 's' : ''})
+              </h2>
+              <button
+                onClick={() => setShowVisualizationLibrary(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '5px',
+                  borderRadius: '50%'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <X size={24} color="#666" />
+              </button>
+            </div>
+
+            {loadingVisualizations ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                Chargement des visualisations...
+              </div>
+            ) : visualizations.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                <BarChart3 size={48} color="#D9D9D9" style={{ marginBottom: '10px' }} />
+                <p>Aucune visualisation disponible</p>
+                <p style={{ fontSize: '14px', marginTop: '5px' }}>
+                  Les visualisations créées apparaîtront ici
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+                {visualizations.map((viz) => {
+                  const isSelected = editFormData.blocks.find(b => b.id === showVisualizationLibrary)?.content?.visualizationId === viz.id;
+
+                  return (
+                    <div
+                      key={viz.id}
+                      style={{
+                        padding: '12px',
+                        border: isSelected ? '3px solid #FF9800' : '2px solid #D9D9D9',
+                        borderRadius: '8px',
+                        backgroundColor: isSelected ? '#fff8f0' : '#f9fafb',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        position: 'relative'
+                      }}
+                      onClick={() => selectVisualization(showVisualizationLibrary, viz.id)}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#FF9800';
+                          e.currentTarget.style.backgroundColor = '#fffaf5';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#D9D9D9';
+                          e.currentTarget.style.backgroundColor = '#f9fafb';
+                        }
+                      }}
+                    >
+                      {/* Titre et type */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: '600', color: '#333', fontSize: '14px' }}>
+                            {viz.chartType}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
+                            {viz.dataset?.name || 'Sans dataset'}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <div style={{
+                            backgroundColor: '#FF9800',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            flexShrink: 0
+                          }}>
+                            ✓
+                          </div>
+                        )}
+                      </div>
+                      {/* Aperçu du graphique */}
+                      <div style={{
+                        backgroundColor: 'white',
+                        borderRadius: '6px',
+                        padding: '8px',
+                        minHeight: '150px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <ChartRenderer
+                          visualization={viz}
+                          isThumbnail={true}
+                          height={150}
+                        />
+                      </div>
                     </div>
                   );
                 })}

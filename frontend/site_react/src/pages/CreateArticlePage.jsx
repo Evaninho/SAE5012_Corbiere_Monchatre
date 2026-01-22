@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, Image as ImageIcon, Type, X, Upload, Folder, BarChart3 } from "lucide-react";
 import { Popup } from "../components/Popup";
 import { ImageBlock } from "../components/common/ImageBlock";
-import { VisualizationBlockEditable } from "../components/common/VisualizationBlockEditable";
+import { VisualizationBlock } from "../components/common/VisualizationBlock";
 import { ChartRenderer } from "../components/common/ChartRenderer";
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -86,7 +86,7 @@ export function CreateArticlePage() {
         'Content-Type': 'application/ld+json',
         'Accept': 'application/ld+json'
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       } else {
@@ -97,7 +97,7 @@ export function CreateArticlePage() {
         method: 'GET',
         headers
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Erreur HTTP ${response.status}:`, response.statusText);
@@ -108,17 +108,17 @@ export function CreateArticlePage() {
 
       const data = await response.json();
       const vizList = data.member || data['hydra:member'] || [];
-      
+
       console.log('✅ Visualisations chargées:', vizList.length);
       console.log('📊 Premier exemple:', vizList[0]);
 
       // Vérifier que les visualisations ont bien la structure complète
-      const validVizList = vizList.filter(viz => 
+      const validVizList = vizList.filter(viz =>
         viz && viz.id && viz.chartType && viz.config
       );
 
       console.log('✅ Visualisations valides:', validVizList.length);
-      
+
       setVisualizations(validVizList);
     } catch (error) {
       console.error('❌ Erreur chargement visualisations:', error);
@@ -557,14 +557,14 @@ export function CreateArticlePage() {
     <div style={styles.pageContainer}>
       <div style={styles.headerStyle}>
         <button
-            onClick={() => navigate('/actualites')}
-            style={styles.backButton}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#006ba3'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#0085C7'}
-          >
-            <ArrowLeft size={18} />
-            Retour
-          </button>
+          onClick={() => navigate('/actualites')}
+          style={styles.backButton}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#006ba3'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#0085C7'}
+        >
+          <ArrowLeft size={18} />
+          Retour
+        </button>
       </div>
       <div style={styles.container}>
         {/* Header */}
@@ -656,7 +656,7 @@ export function CreateArticlePage() {
 
               {/* Contenu VISUALISATION */}
               {block.type === 'visualization' && (
-                <VisualizationBlockEditable
+                <VisualizationBlock
                   blockId={block.id}
                   visualizationId={block.content?.visualizationId}
                   visualizations={visualizations}
