@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Popup } from '../components/Popup';
 import { ImageBlock } from '../components/common/ImageBlock';
 import { VisualizationBlockEditable } from '../components/common/VisualizationBlockEditable';
-import ChartRenderer from '../components/common/ChartRenderer';
+import { ChartRenderer } from '../components/common/ChartRenderer';
 import { SearchBar } from '../components/common/SearchBar';
 import { LoadingScreen } from '../utils/LoadingScreen';
 

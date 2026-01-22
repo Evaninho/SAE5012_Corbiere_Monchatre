@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart3, X } from 'lucide-react';
-import ChartRenderer from './ChartRenderer';
+import { ChartRenderer } from './ChartRenderer';
 
 /**
  * VisualizationBlock - Composant d'affichage d'une visualisation
@@ -89,7 +89,6 @@ export function VisualizationBlock({
           )}
         </div>
       )}
-
       <div style={{
         backgroundColor: 'white',
         padding: '15px',

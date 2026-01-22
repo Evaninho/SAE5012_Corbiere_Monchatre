@@ -1,54 +1,44 @@
-import { useEffect, useState } from 'react';
-import Papa from 'papaparse';
+import React, { useState, useEffect } from 'react';
 import {
-  BarChart, Bar,
-  LineChart, Line,
-  PieChart, Pie, Cell,
-  ScatterChart, Scatter,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer
+  BarChart, Bar, LineChart, Line, PieChart, Pie,
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, Cell, ResponsiveContainer
 } from 'recharts';
+import Papa from 'papaparse';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 const API_BASE = 'http://localhost:8000/api';
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF6B9D'];
 
 /**
- * ChartRenderer - Composant central et unique pour afficher tous les graphiques
- * 
- * Props:
- * - visualization: { id, chartType, config, dataset: { id, name, path }, datasetId }
- * - isThumbnail: boolean (true = affichage miniature, false = affichage complet)
- * - height: nombre (hauteur en pixels)
+ * ChartRenderer - Affiche un graphique à partir d'une visualisation
+ * Utilise Papa.parse comme StatsPage.jsx
  */
-export default function ChartRenderer({
-  visualization,
-  isThumbnail = false,
-  height = null
-}) {
-  const [data, setData] = useState([]);
+export function ChartRenderer({ visualization, height = 350 }) {
+  const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Déterminer la hauteur
-  const displayHeight = height || (isThumbnail ? 140 : 300);
+  const [csvData, setCsvData] = useState([]);
 
   useEffect(() => {
-    if (!visualization) {
-      setError('Visualisation manquante');
+    if (!visualization?.config) {
+      setError('Configuration manquante');
       setLoading(false);
       return;
     }
-
+    
     loadChartData();
-  }, [visualization?.id, visualization?.dataset?.id, visualization?.datasetId]);
+  }, [visualization?.id, visualization?.dataset?.id]);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('authToken');
-    return {
+    const headers = {
       'Content-Type': 'application/ld+json',
-      'Accept': 'application/ld+json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      'Accept': 'application/ld+json'
     };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   };
 
   const loadChartData = async () => {
@@ -56,94 +46,174 @@ export default function ChartRenderer({
       setLoading(true);
       setError(null);
 
-      // Déterminer l'ID du dataset
-      let datasetId = visualization?.dataset?.id || visualization?.datasetId;
-
-      // Si pas d'ID dataset, on essaie de récupérer la viz complète
+      let datasetId = visualization?.dataset?.id;
+      // console.log(visualization);
+      // console.log(visualization?.dataset?.id);
+      
+      
+      // Si pas de dataset.id, on récupère la visualisation complète via l'API
       if (!datasetId && visualization?.id) {
         try {
-          const fullVizResponse = await fetch(
-            `${API_BASE}/visualizations/${visualization.id}`,
-            { headers: getAuthHeaders() }
-          );
+          const fullVizResponse = await fetch(`${API_BASE}/visualizations/${visualization.id}`, {
+            headers: getAuthHeaders()
+          });
+          
           if (fullVizResponse.ok) {
             const fullViz = await fullVizResponse.json();
             datasetId = fullViz?.dataset?.id || fullViz?.datasetId;
           }
-        } catch (err) {
-          console.warn('Impossible enrichir visualisation:', err);
+        } catch (enrichError) {
+          console.warn('Impossible enrichir visualisation:', enrichError);
         }
       }
-
+      
       if (!datasetId) {
-        setError('Dataset non disponible');
+        setError('Pas de dataset disponible');
         setLoading(false);
         return;
       }
-
-      // Charger le CSV du dataset
+      
+      console.log(`📥 Chargement du CSV pour datasetId: ${datasetId}`);
+      
+      // Utiliser l'endpoint /download comme dans StatsPage (évite les problèmes d'URL)
       const csvUrl = `${API_BASE}/datasets/${datasetId}/download`;
+      console.log(`📍 URL CSV:`, csvUrl);
+      
+      // Headers spécifiques pour le téléchargement CSV
+      const csvHeaders = {
+        'Accept': 'text/csv, text/plain, */*'
+      };
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        csvHeaders['Authorization'] = `Bearer ${token}`;
+      }
+      
+      console.log('📤 Headers:', csvHeaders);
+      
       const csvResponse = await fetch(csvUrl, {
-        headers: getAuthHeaders()
+        headers: csvHeaders
       });
 
       if (!csvResponse.ok) {
-        throw new Error(`Erreur HTTP ${csvResponse.status}: ${csvResponse.statusText}`);
+        console.error(`❌ Erreur CSV ${csvResponse.status}:`, csvResponse.statusText);
+        console.error('URL tentée:', csvUrl);
+        throw new Error(`Erreur chargement CSV: ${csvResponse.status}`);
       }
 
+      console.log('✅ CSV téléchargé avec succès');
       const csvText = await csvResponse.text();
-
-      // Parser le CSV
+      
+      // Parser le CSV avec Papa.parse (comme dans StatsPage)
       Papa.parse(csvText, {
         header: true,
+        delimiter: ',',
+        dynamicTyping: true,
         skipEmptyLines: true,
+        trimHeaders: true,
+        transformHeader: (h) => h.trim(),
         complete: (results) => {
-          if (!results.data || results.data.length === 0) {
-            setError('Données CSV vides');
+          try {
+            if (!results.data || results.data.length === 0) {
+              setError('Aucune donnée dans le CSV');
+              setLoading(false);
+              return;
+            }
+
+            // Nettoyer les données (trim des clés)
+            const trimmedData = results.data.map(row => {
+              const newRow = {};
+              Object.keys(row).forEach(key => {
+                newRow[key.trim()] = row[key];
+              });
+              return newRow;
+            }).filter(row => Object.values(row).some(v => v !== null && v !== ''));
+
+            console.log(`📊 Données parsées: ${trimmedData.length} lignes`);
+            setCsvData(trimmedData);
+            
+            const mapped = mapChartData(trimmedData, visualization.config);
+            setChartData(mapped);
             setLoading(false);
-            return;
+          } catch (parseError) {
+            console.error('❌ Erreur parsing données:', parseError);
+            setError('Erreur parsing CSV');
+            setLoading(false);
           }
-
-          // Formater les données pour recharts
-          const formatted = results.data.map(row => {
-            const obj = {};
-            Object.keys(row).forEach(key => {
-              const trimmed = row[key]?.toString().trim();
-              // Essayer convertir en nombre si possible
-              obj[key] = isNaN(trimmed) ? trimmed : Number(trimmed) || trimmed;
-            });
-            return obj;
-          });
-
-          setData(formatted);
-          setLoading(false);
         },
-        error: (error) => {
-          setError('Erreur parsing CSV: ' + error.message);
+        error: (err) => {
+          console.error('❌ Erreur Papa.parse:', err);
+          setError(`Erreur parsing: ${err.message}`);
           setLoading(false);
         }
       });
     } catch (err) {
       console.error('Erreur chargement graphique:', err);
-      setError(err.message || 'Erreur inconnue');
+      setError(err.message || 'Erreur');
       setLoading(false);
     }
   };
 
-  // États de chargement et erreur
+  const mapChartData = (data, config) => {
+    if (!data.length || !config?.xAxis || !config?.yAxis) return [];
+
+    const getDataValue = (row, key) => {
+      if (row.hasOwnProperty(key)) return row[key];
+      const trimmedKey = Object.keys(row).find(k => k && k.trim() === key?.trim?.());
+      return trimmedKey ? row[trimmedKey] : null;
+    };
+
+    return data.map(row => {
+      const xValue = String(getDataValue(row, config.xAxis) || '').substring(0, 50).trim();
+      const yValue = parseFloat(getDataValue(row, config.yAxis)) || 0;
+      return {
+        name: xValue || '(vide)',
+        value: yValue,
+        _original: row
+      };
+    })
+      .filter(item => item.name !== '(vide)' || item.value !== 0)
+      .slice(0, 100);
+  };
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload?.length) {
+      const data = payload[0].payload;
+      return (
+        <div style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+          padding: '12px 14px',
+          border: '2px solid #FF9800',
+          borderRadius: '6px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          fontSize: '12px'
+        }}>
+          <p style={{ margin: '3px 0', color: '#333' }}>
+            <strong>{visualization.config?.xAxis}:</strong> {data.name}
+          </p>
+          <p style={{ margin: '3px 0', color: '#FF9800', fontWeight: 'bold' }}>
+            <strong>{visualization.config?.yAxis}:</strong> {data.value}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // États affichage
   if (loading) {
     return (
       <div style={{
-        height: `${displayHeight}px`,
-        backgroundColor: '#f5f5f5',
-        borderRadius: '8px',
+        width: '100%',
+        height: `${height}px`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: '#999',
-        fontSize: '12px'
+        fontSize: '14px',
+        backgroundColor: '#fafafa',
+        borderRadius: '8px'
       }}>
-        ⏳ Chargement...
+        ⏳ Chargement du graphique...
       </div>
     );
   }
@@ -151,15 +221,16 @@ export default function ChartRenderer({
   if (error) {
     return (
       <div style={{
-        height: `${displayHeight}px`,
-        backgroundColor: '#fff5f5',
-        borderRadius: '8px',
+        width: '100%',
+        height: `${height}px`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: '#dc2626',
-        fontSize: '12px',
-        padding: '10px',
+        fontSize: '13px',
+        backgroundColor: '#fff5f5',
+        borderRadius: '8px',
+        padding: '20px',
         textAlign: 'center'
       }}>
         ❌ {error}
@@ -167,115 +238,129 @@ export default function ChartRenderer({
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!chartData.length) {
     return (
       <div style={{
-        height: `${displayHeight}px`,
-        backgroundColor: '#f9fafb',
-        borderRadius: '8px',
+        width: '100%',
+        height: `${height}px`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         color: '#999',
-        fontSize: '12px'
+        fontSize: '14px',
+        backgroundColor: '#fafafa',
+        borderRadius: '8px'
       }}>
-        Pas de données
+        📊 Aucune donnée
       </div>
     );
   }
 
-  // Déterminer les colonnes à afficher (prendre les 2 premières)
-  const keys = Object.keys(data[0]);
-  const xKey = keys[0];
-  const yKey = keys[1] || keys[0];
+  const config = visualization.config;
+  const colors = config?.colors || COLORS;
+  const chartType = visualization.chartType;
 
-  // Rendu du graphique selon le type
-  const chartType = visualization?.chartType?.toLowerCase() || 'bar';
+  const commonProps = {
+    width: '100%',
+    height: height
+  };
 
-  switch (chartType) {
-    case 'bar':
-      return (
-        <ResponsiveContainer width="100%" height={displayHeight}>
-          <BarChart data={data}>
-            {!isThumbnail && <CartesianGrid strokeDasharray="3 3" />}
-            {!isThumbnail && <XAxis dataKey={xKey} />}
-            {!isThumbnail && <YAxis />}
-            {!isThumbnail && <Tooltip />}
-            {!isThumbnail && <Legend />}
-            <Bar dataKey={yKey} fill="#0088FE" radius={isThumbnail ? 0 : [8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      );
+  const getDataValue = (row, key) => {
+    if (row.hasOwnProperty(key)) return row[key];
+    const trimmedKey = Object.keys(row).find(k => k && k.trim() === key?.trim?.());
+    return trimmedKey ? row[trimmedKey] : null;
+  };
 
-    case 'line':
-      return (
-        <ResponsiveContainer width="100%" height={displayHeight}>
-          <LineChart data={data}>
-            {!isThumbnail && <CartesianGrid strokeDasharray="3 3" />}
-            {!isThumbnail && <XAxis dataKey={xKey} />}
-            {!isThumbnail && <YAxis />}
-            {!isThumbnail && <Tooltip />}
-            {!isThumbnail && <Legend />}
-            <Line
-              type="monotone"
-              dataKey={yKey}
-              stroke="#00C49F"
-              dot={!isThumbnail}
-              strokeWidth={isThumbnail ? 1 : 2}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      );
+  const renderChart = () => {
+    switch (chartType) {
+      case 'bar':
+        return (
+          <ResponsiveContainer {...commonProps}>
+            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} style={{ fontSize: '11px' }} />
+              <YAxis style={{ fontSize: '11px' }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 152, 0, 0.1)' }} />
+              <Legend wrapperStyle={{ paddingTop: '15px' }} />
+              <Bar dataKey="value" name={config?.yAxis || 'Valeur'}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
 
-    case 'pie':
-      return (
-        <ResponsiveContainer width="100%" height={displayHeight}>
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey={yKey}
-              nameKey={xKey}
-              outerRadius={isThumbnail ? 40 : 80}
-              label={!isThumbnail}
-            >
-              {data.map((_, i) => (
-                <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </Pie>
-            {!isThumbnail && <Tooltip />}
-            {!isThumbnail && <Legend />}
-          </PieChart>
-        </ResponsiveContainer>
-      );
+      case 'line':
+        return (
+          <ResponsiveContainer {...commonProps}>
+            <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} style={{ fontSize: '11px' }} />
+              <YAxis style={{ fontSize: '11px' }} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#FF9800', strokeWidth: 2 }} />
+              <Legend wrapperStyle={{ paddingTop: '15px' }} />
+              <Line type="monotone" dataKey="value" stroke="#FF9800" name={config?.yAxis || 'Valeur'} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        );
 
-    case 'scatter':
-      return (
-        <ResponsiveContainer width="100%" height={displayHeight}>
-          <ScatterChart>
-            {!isThumbnail && <CartesianGrid strokeDasharray="3 3" />}
-            {!isThumbnail && <XAxis dataKey={xKey} />}
-            {!isThumbnail && <YAxis />}
-            {!isThumbnail && <Tooltip />}
-            {!isThumbnail && <Legend />}
-            <Scatter dataKey={yKey} data={data} fill="#FF8042" />
-          </ScatterChart>
-        </ResponsiveContainer>
-      );
+      case 'pie':
+        return (
+          <ResponsiveContainer {...commonProps}>
+            <PieChart margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="45%"
+                cy="45%"
+                outerRadius={80}
+                label={({ name, value }) => `${name}: ${value}`}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<CustomTooltip />} />
+              <Legend verticalAlign="bottom" height={30} wrapperStyle={{ paddingTop: '15px' }} />
+            </PieChart>
+          </ResponsiveContainer>
+        );
 
-    default:
-      return (
-        <div style={{
-          height: `${displayHeight}px`,
-          backgroundColor: '#f9fafb',
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#999',
-          fontSize: '12px'
-        }}>
-          Type '{chartType}' non supporté
-        </div>
-      );
-  }
+      case 'scatter':
+        return (
+          <ResponsiveContainer {...commonProps}>
+            <ScatterChart margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+              <XAxis dataKey="name" style={{ fontSize: '11px' }} />
+              <YAxis dataKey="value" style={{ fontSize: '11px' }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ paddingTop: '15px' }} />
+              <Scatter name={config?.yAxis || 'Valeur'} data={chartData} fill={colors[0]} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        );
+
+      default:
+        return (
+          <div style={{
+            width: '100%',
+            height: `${height}px`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#999'
+          }}>
+            Type de graphique inconnu: {chartType}
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div style={{ width: '100%', height: `${height}px` }}>
+      {renderChart()}
+    </div>
+  );
 }
