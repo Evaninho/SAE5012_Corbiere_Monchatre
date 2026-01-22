@@ -5,7 +5,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { Popup } from '../components/Popup';
 import { ImageBlock } from '../components/common/ImageBlock';
 import { VisualizationBlock } from '../components/common/VisualizationBlock';
-import { ChartRenderer } from '../components/common/ChartRendererold';
+import { ChartRenderer } from '../components/common/ChartRenderer';
 import { LoadingScreen } from '../utils/LoadingScreen';
 
 const API_BASE_URL = 'http://localhost:8000/api';

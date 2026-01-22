@@ -5,7 +5,7 @@ import { Search } from "../components/news/search";
 import { MessageSquare, Heart, Star, Plus, Settings, RefreshCw } from "lucide-react";
 import { usePermissions } from '../hooks/usePermissions';
 import { LoadingScreen } from '../utils/LoadingScreen';
-import { ChartRenderer } from '../components/common/ChartRendererold';
+import { ChartRenderer } from '../components/common/ChartRenderer';
 
 // ========== CONSTANTE API ==========
 const API_BASE_URL = 'http://localhost:8000/api';

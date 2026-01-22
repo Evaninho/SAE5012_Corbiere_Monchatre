@@ -4,7 +4,7 @@ import { Plus, Trash2, ArrowUp, ArrowDown, ArrowLeft, Image as ImageIcon, Type, 
 import { Popup } from "../components/Popup";
 import { ImageBlock } from "../components/common/ImageBlock";
 import { VisualizationBlock } from "../components/common/VisualizationBlock";
-import { ChartRenderer } from "../components/common/ChartRendererold";
+import { ChartRenderer } from "../components/common/ChartRenderer";
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
@@ -89,6 +89,8 @@ export function CreateArticlePage() {
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        console.warn('⚠️ Pas de token trouvé - les visualisations peuvent être inaccessibles');
       }
 
       const response = await fetch(`${API_BASE_URL}/visualizations`, {
@@ -97,45 +99,29 @@ export function CreateArticlePage() {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
         console.error(`Erreur HTTP ${response.status}:`, response.statusText);
-        throw new Error(`Erreur HTTP ${response.status}`);
+        console.error('Réponse serveur:', errorText);
+        console.log('Token envoyé:', token ? '✓ Oui' : '✗ Non');
+        throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      const vizList = data.member || [];
+      const vizList = data.member || data['hydra:member'] || [];
+      
+      console.log('✅ Visualisations chargées:', vizList.length);
+      console.log('📊 Premier exemple:', vizList[0]);
 
-      // Enrichir les visualisations avec les informations complètes du dataset si manquant
-      const enrichedVizList = await Promise.all(
-        vizList.map(async (viz) => {
-          // Si dataset manque mais on a un datasetId ou dataset.id existe
-          const hasDataset = viz.dataset && viz.dataset.id;
-          const hasDatasetId = viz.datasetId || (viz.dataset && typeof viz.dataset === 'string');
-          
-          if (!hasDataset && (hasDatasetId)) {
-            try {
-              const actualDatasetId = viz.datasetId || viz.dataset;
-              const datasetResponse = await fetch(`${API_BASE_URL}/datasets/${actualDatasetId}`, {
-                headers
-              });
-              if (datasetResponse.ok) {
-                const dataset = await datasetResponse.json();
-                return {
-                  ...viz,
-                  dataset: dataset,
-                  datasetId: actualDatasetId
-                };
-              }
-            } catch (err) {
-              console.warn(`Impossible charger dataset pour visualisation ${viz.id}:`, err);
-            }
-          }
-          return viz;
-        })
+      // Vérifier que les visualisations ont bien la structure complète
+      const validVizList = vizList.filter(viz => 
+        viz && viz.id && viz.chartType && viz.config
       );
 
-      setVisualizations(enrichedVizList);
+      console.log('✅ Visualisations valides:', validVizList.length);
+      
+      setVisualizations(validVizList);
     } catch (error) {
-      console.error('Erreur chargement visualisations:', error);
+      console.error('❌ Erreur chargement visualisations:', error);
       setVisualizations([]);
     } finally {
       setLoadingVisualizations(false);
@@ -672,12 +658,14 @@ export function CreateArticlePage() {
               {block.type === 'visualization' && (
                 <VisualizationBlock
                   blockId={block.id}
-                  visualizationId={block.content.visualizationId}
+                  visualizationId={block.content?.visualizationId}
                   visualizations={visualizations}
                   loadingVisualizations={loadingVisualizations}
-                  onVisualizationSelect={selectVisualization}
-                  onRemoveVisualization={removeVisualizationFromBlock}
                   onOpenMediaLibrary={setShowVisualizationLibrary}
+                  onRemove={removeVisualizationFromBlock}
+                  height={350}
+                  showTitle={true}
+                  editable={true}
                 />
               )}
             </div>
