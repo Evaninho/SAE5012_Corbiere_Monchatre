@@ -15,7 +15,7 @@ use ApiPlatform\Metadata\{ApiResource, Get, GetCollection, Post, Patch, Delete};
         new Get(),
         new GetCollection(),
         new Post(
-            security: "is_granted('ROLE_USER') or is_granted('ROLE_AUTHOR') or is_granted('ROLE_EDITOR') or is_granted('ROLE_ADMIN')",
+            security: "is_granted('ROLE_USER') or is_granted('ROLE_AUTHOR') or is_granted('ROLE_EDITOR') or is_granted('ROLE_DATA_PROVIDER') or is_granted('ROLE_ADMIN')",
             processor: RatingProcessor::class
         ),
         new Patch(
