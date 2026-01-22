@@ -111,9 +111,9 @@ export default function StatsPage() {
     try {
       setLoading(true);
       const token = getToken();
-      console.log('🔐 Token présent:', !!token);
-      console.log('🔑 Token valeur:', token ? `${token.substring(0, 20)}...` : 'AUCUN');
-      
+      // console.log('🔐 Token présent:', !!token);
+      // console.log('🔑 Token valeur:', token ? `${token.substring(0, 20)}...` : 'AUCUN');
+
       const response = await fetch(`${API_BASE}/datasets`, {
         headers: getAuthHeaders()
       });
@@ -125,11 +125,11 @@ export default function StatsPage() {
       }
 
       const data = await response.json();
-      console.log('📦 Données reçues de l\'API:', data);
-      
+      // console.log('📦 Données reçues de l\'API:', data);
+
       const datasetsWithViz = data.member || data['hydra:member'] || [];
-      console.log('📊 Datasets trouvés:', datasetsWithViz.length);
-      
+      // console.log('📊 Datasets trouvés:', datasetsWithViz.length);
+
       // Charger les visualisations pour chaque dataset
       const datasetsEnriched = await Promise.all(
         datasetsWithViz.map(async (dataset) => {
@@ -150,8 +150,8 @@ export default function StatsPage() {
           return dataset;
         })
       );
-      
-      console.log('✅ Datasets finaux:', datasetsEnriched);
+
+      // console.log('✅ Datasets finaux:', datasetsEnriched);
       setDatasets(datasetsEnriched);
     } catch (error) {
       console.error('❌ Erreur chargement datasets:', error);
@@ -170,18 +170,18 @@ export default function StatsPage() {
     try {
       setLoading(true);
       console.log(`📥 Chargement du CSV pour le dataset ${datasetId}:`, filename);
-      
+
       // Utiliser l'API pour télécharger le CSV (évite les problèmes CORS)
       const response = await fetch(`${API_BASE}/datasets/${datasetId}/download`, {
         headers: getAuthHeaders()
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const csvText = await response.text();
-      console.log('✅ CSV chargé avec succès');
+      // console.log('✅ CSV chargé avec succès');
 
       return new Promise((resolve) => {
         Papa.parse(csvText, {
@@ -200,15 +200,15 @@ export default function StatsPage() {
               });
               return newRow;
             });
-            
+
             setCsvData(trimmedData);
             const trimmedFields = (results.meta.fields || []).map(f => f.trim());
             setCsvHeaders(trimmedFields);
-            
+
             // Détecter le format du CSV
             detectCSVFormat(trimmedData, trimmedFields);
-            
-            console.log(`📊 Données parsées: ${trimmedData.length} lignes, ${trimmedFields.length} colonnes`, trimmedFields);
+
+            // console.log(`📊 Données parsées: ${trimmedData.length} lignes, ${trimmedFields.length} colonnes`, trimmedFields);
             resolve({ data: trimmedData, headers: trimmedFields });
           },
           error: (error) => {
@@ -254,7 +254,7 @@ export default function StatsPage() {
 
   // ========== INTERACTIONS UTILISATEUR ==========
   const handleSelectDataset = async (dataset) => {
-    console.log('📌 Sélection du dataset:', dataset.name);
+    // console.log('📌 Sélection du dataset:', dataset.name);
     setSelectedDataset(dataset);
     loadVisualizations(dataset.id);
 
@@ -320,7 +320,7 @@ export default function StatsPage() {
       }
 
       const data = await response.json();
-      console.log('✅ Dataset uploadé:', data);
+      // console.log('✅ Dataset uploadé:', data);
 
       closeModal('upload');
       setUploadFile(null);
@@ -452,7 +452,7 @@ export default function StatsPage() {
       }
 
       const data = await response.json();
-      console.log('✅ Visualisation créée:', data);
+      // console.log('✅ Visualisation créée:', data);
 
       closeModal('createViz');
       setVizForm({ chartType: 'bar', xAxis: '', yAxis: '', colors: COLORS, title: '' });
@@ -494,13 +494,13 @@ export default function StatsPage() {
 
     try {
       setLoading(true);
-      
+
       // Extraire l'ID numérique si c'est au format IRI
       const numericId = typeof vizId === 'string' && vizId.includes('/') ? vizId.split('/').pop() : vizId;
       const deleteUrl = `${API_BASE}/visualizations/${numericId}`;
-      
+
       console.log('🗑️ Suppression de la visualisation:', { vizId, numericId, deleteUrl });
-      
+
       const response = await fetch(deleteUrl, {
         method: 'DELETE',
         headers: getAuthHeaders()
@@ -510,10 +510,10 @@ export default function StatsPage() {
 
       closeModal('viewViz');
       setSelectedViz(null);
-      
+
       // Recharger les visualisations pour mettre à jour la liste
       await loadVisualizations(selectedDataset.id);
-      
+
       setPopup({
         isOpen: true,
         type: 'success',
@@ -536,7 +536,7 @@ export default function StatsPage() {
   // ========== RENDU GRAPHIQUES ==========
   const renderChart = (viz, data) => {
     const config = viz.config;
-    
+
     // Trouver les vraies clés dans les données (trim les espaces)
     const getDataValue = (row, key) => {
       // Chercher d'abord la clé exacte
@@ -547,7 +547,7 @@ export default function StatsPage() {
       const trimmedKey = Object.keys(row).find(k => k.trim() === key.trim());
       return trimmedKey ? row[trimmedKey] : null;
     };
-    
+
     // Filtrer par année si le CSV est au format 'yearly'
     let filteredData = data;
     if (csvFormat === 'yearly' && selectedYear) {
@@ -557,7 +557,7 @@ export default function StatsPage() {
       });
       console.log(`🎯 Données filtrées pour l'année ${selectedYear}: ${filteredData.length} lignes`);
     }
-    
+
     // Mapper les données avec validation et trim des clés
     // Important: on traite TOUTES les données d'abord, puis on trie, puis on limite
     let chartData = filteredData.map(row => {
@@ -583,8 +583,8 @@ export default function StatsPage() {
     // Hauteur dynamique : minimum 400px, puis ajustée selon le nombre de lignes
     const dynamicHeight = Math.max(400, 200 + chartData.length * 20);
 
-    console.log('📊 Chart Data:', { 
-      xAxis: config.xAxis, 
+    console.log('📊 Chart Data:', {
+      xAxis: config.xAxis,
       yAxis: config.yAxis,
       rowsLimit: chartRowsLimit,
       sortOrder: chartSortOrder,
@@ -601,7 +601,7 @@ export default function StatsPage() {
         const dataPoint = payload[0];
         // Accès aux données originales du chartData via payload[0].payload
         const originalData = dataPoint.payload;
-        
+
         return (
           <div style={{
             backgroundColor: 'rgba(255, 255, 255, 0.98)',
@@ -629,16 +629,16 @@ export default function StatsPage() {
         <ResponsiveContainer {...commonProps}>
           <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45} 
-              textAnchor="end" 
+            <XAxis
+              dataKey="name"
+              angle={-45}
+              textAnchor="end"
               height={100}
               style={{ fontSize: '12px' }}
             />
             <YAxis style={{ fontSize: '12px' }} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 136, 254, 0.1)' }} />
-            <Legend 
+            <Legend
               wrapperStyle={{ paddingTop: '20px' }}
               verticalAlign="top"
               height={36}
@@ -668,13 +668,13 @@ export default function StatsPage() {
                 <Cell key={`cell-${index}`} fill={config.colors[index % config.colors.length]} />
               ))}
             </Pie>
-            <Tooltip 
+            <Tooltip
               content={<CustomTooltip />}
               formatter={(value) => `${config.yAxis}: ${value}`}
               labelFormatter={(label) => `${config.xAxis}: ${label}`}
             />
-            <Legend 
-              verticalAlign="bottom" 
+            <Legend
+              verticalAlign="bottom"
               height={36}
               wrapperStyle={{ paddingTop: '20px' }}
             />
@@ -685,24 +685,24 @@ export default function StatsPage() {
         <ResponsiveContainer {...commonProps}>
           <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-            <XAxis 
-              dataKey="name" 
-              angle={-45} 
-              textAnchor="end" 
+            <XAxis
+              dataKey="name"
+              angle={-45}
+              textAnchor="end"
               height={100}
               style={{ fontSize: '12px' }}
             />
             <YAxis style={{ fontSize: '12px' }} />
             <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#0088FE', strokeWidth: 2 }} />
-            <Legend 
+            <Legend
               wrapperStyle={{ paddingTop: '20px' }}
               verticalAlign="top"
               height={36}
             />
-            <Line 
-              type="monotone" 
-              dataKey="value" 
-              stroke="#0088FE" 
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke="#0088FE"
               strokeWidth={3}
               dot={{ fill: '#0088FE', r: 5 }}
               activeDot={{ r: 7, fill: '#FF8042' }}
@@ -715,27 +715,27 @@ export default function StatsPage() {
         <ResponsiveContainer {...commonProps}>
           <ScatterChart margin={{ top: 20, right: 30, left: 0, bottom: 80 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-            <XAxis 
-              dataKey="name" 
-              type="category" 
-              angle={-45} 
-              textAnchor="end" 
+            <XAxis
+              dataKey="name"
+              type="category"
+              angle={-45}
+              textAnchor="end"
               height={100}
               style={{ fontSize: '12px' }}
             />
-            <YAxis 
+            <YAxis
               dataKey="value"
               style={{ fontSize: '12px' }}
             />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0, 136, 254, 0.1)' }} />
-            <Legend 
+            <Legend
               verticalAlign="top"
               height={36}
               wrapperStyle={{ paddingTop: '20px' }}
             />
-            <Scatter 
-              data={chartData} 
-              fill="#0088FE" 
+            <Scatter
+              data={chartData}
+              fill="#0088FE"
               name={config.yAxis || 'Valeur'}
               shape="circle"
             />
@@ -1017,8 +1017,8 @@ const DatasetsList_Component = ({ styles, datasets, loading, handleSelectDataset
             💡 Ouvrez la console (F12) pour voir les messages de debug
           </p>
         </div>
-        <button 
-          style={styles.buttonPrimary} 
+        <button
+          style={styles.buttonPrimary}
           onClick={() => {
             console.log('🔄 Rechargement manuel des datasets...');
             loadDatasetsFromDB();
@@ -1121,8 +1121,8 @@ const VisualizationsSection_Component = ({ styles, selectedDataset, vizList, ope
   );
 };
 
-  // Modale d'upload
-  const UploadModal_Component = ({ styles, modals, closeModal, uploadName, setUploadName, uploadFile, setUploadFile, loading, handleUploadDataset }) => {
+// Modale d'upload
+const UploadModal_Component = ({ styles, modals, closeModal, uploadName, setUploadName, uploadFile, setUploadFile, loading, handleUploadDataset }) => {
   if (!modals.upload) return null;
 
   return (
@@ -1314,7 +1314,7 @@ const ViewVizModal_Component = ({ styles, modals, closeModal, selectedViz, userR
               </select>
             </div>
           )}
-          
+
           <div>
             <label style={{ fontWeight: '600', color: '#2d3748', marginRight: '8px', fontSize: '14px' }}>
               📊 Nombre de lignes:

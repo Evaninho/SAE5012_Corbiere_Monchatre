@@ -119,9 +119,12 @@ export function GestionArticlesPage() {
         id: viz.id,
         chartType: viz.chartType,
         config: viz.config,
+        titre: viz.config?.title,
         dataset: viz.dataset,
         datasetId: viz.datasetId
       }));
+      console.log(newVisualizations);
+      
 
       setVisualizations(newVisualizations);
     } catch (error) {
@@ -199,23 +202,6 @@ export function GestionArticlesPage() {
     fontWeight: '600',
     transition: 'all 0.2s'
   };
-
-  const filtersContainerStyle = {
-    backgroundColor: "white",
-    padding: "20px",
-    borderRadius: "10px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-    marginBottom: "20px"
-  };
-
-  const searchInputStyle = {
-    width: "100%",
-    padding: "10px 15px 10px 40px",
-    borderRadius: "10px",
-    border: "1px solid #D9D9D9",
-    fontSize: "14px"
-  };
-
   const tableContainerStyle = {
     backgroundColor: "white",
     borderRadius: "10px",
@@ -319,6 +305,8 @@ export function GestionArticlesPage() {
         }
       });
       if (!response.ok) throw new Error('Erreur de suppression');
+      console.log(response.status);
+      
       return articleId;
     },
     onSuccess: () => {
@@ -397,8 +385,10 @@ export function GestionArticlesPage() {
 
   // Confirmer suppression
   const confirmDelete = () => {
-    if (articleToDelete) {
+    if (articleToDelete) {      
       deleteMutation.mutate(articleToDelete.id);
+      console.log(articleToDelete.id);
+
       setShowDeleteModal(false);
       setArticleToDelete(null);
     }
@@ -1241,6 +1231,9 @@ export function GestionArticlesPage() {
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: '600', color: '#333', fontSize: '14px' }}>
                             {viz.chartType}
+                          </div>
+                          <div style={{ fontWeight: '600', color: '#FF9800', fontSize: '14px' }}>
+                            {viz.titre}
                           </div>
                           <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
                             {viz.dataset?.name || 'Sans dataset'}

@@ -1813,6 +1813,9 @@ export function NewsDetailPage() {
                           <div style={{ fontWeight: '600', color: '#333', fontSize: '14px' }}>
                             {viz.chartType}
                           </div>
+                          <div style={{ fontWeight: '600', color: '#FF9800', fontSize: '14px' }}>
+                            {viz.config?.title}
+                          </div>
                           <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
                             {viz.dataset?.name || 'Sans dataset'}
                           </div>
