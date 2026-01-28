@@ -6,7 +6,7 @@ const UserMenu = ({ onLogout }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [userData, setUserData] = useState(null);
 
-  // 🔄 Synchronisation login / logout
+  //  Synchronisation login / logout
   useEffect(() => {
     const loadUser = () => {
       const stored = localStorage.getItem("userData");

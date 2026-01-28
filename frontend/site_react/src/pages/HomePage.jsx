@@ -186,7 +186,7 @@ export function HomePage() {
 
     const ctaButtonStyle = {
         display: "block",
-        width: "300px",
+        width: "30vw",
         margin: "0 auto",
         padding: "15px 30px",
         backgroundColor: "#0085C7",

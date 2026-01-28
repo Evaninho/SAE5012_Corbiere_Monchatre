@@ -500,15 +500,6 @@ export function LoginForm() {
                             />
                             <span>Se souvenir de moi</span>
                         </label>
-
-                        {/* <span
-                            style={forgotLinkStyle}
-                            onClick={() => setShowForgotPassword(true)}
-                            onMouseEnter={(e) => e.target.style.color = "#006ba3"}
-                            onMouseLeave={(e) => e.target.style.color = "#0085C7"}
-                        >
-                            Mot de passe oublié ?
-                        </span> */}
                         <span
                             style={forgotLinkStyle}
                             onClick={() => {

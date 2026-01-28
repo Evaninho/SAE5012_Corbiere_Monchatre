@@ -1,5 +1,3 @@
-// src/hooks/usePermissions.js
-
 import { useState, useEffect } from 'react';
 import { 
   hasPermission, 

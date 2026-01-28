@@ -289,15 +289,16 @@ export function Navbar() {
               style={{
                 display: 'block',
                 padding: '12px 16px',
-                backgroundColor: '#0085C7',
-                color: 'white',
+                backgroundColor: 'white',
+                border: 'solid 2px #009F3D',
+                color: 'black',
                 textDecoration: 'none',
                 borderRadius: '8px',
                 fontWeight: '600',
                 textAlign: 'center'
               }}
             >
-              👤 Se connecter
+              Se connecter
             </Link>
           )}
         </div>
